@@ -1,0 +1,8 @@
+2025-05-30 11:07:13 [info]: Database configuration:
+{
+  "type": "SQLite",
+  "path": "C:\\Users\\Shon PC\\Desktop\\smart-home-crm\\src\\database.sqlite"
+}
+2025-05-30 11:07:13 [info]: Server is running on port 3001
+2025-05-30 11:07:13 [info]: Database connection successful
+2025-05-30 11:07:13 [info]: Database tables initialized

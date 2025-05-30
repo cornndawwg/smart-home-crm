@@ -1,0 +1,346 @@
+import React, { useState } from 'react';
+import {
+  Box,
+  Drawer,
+  AppBar,
+  Toolbar,
+  Typography,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  IconButton,
+  Avatar,
+  Menu,
+  MenuItem,
+  Divider,
+  Chip,
+  useTheme,
+  alpha,
+} from '@mui/material';
+import {
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Campaign as CampaignIcon,
+  TrendingUp as LeadIcon,
+  Business as BusinessIcon,
+  Assignment as ProjectIcon,
+  Settings as SettingsIcon,
+  Notifications as NotificationsIcon,
+  Menu as MenuIcon,
+  AccountCircle,
+  Logout as LogoutIcon,
+} from '@mui/icons-material';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
+
+const DRAWER_WIDTH = 280;
+
+interface NavigationItem {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  badge?: number;
+  description?: string;
+}
+
+const navigationItems: NavigationItem[] = [
+  {
+    label: 'Dashboard',
+    href: '/',
+    icon: <DashboardIcon />,
+    description: 'Overview and analytics'
+  },
+  {
+    label: 'Lead Generation',
+    href: '/leads',
+    icon: <LeadIcon />,
+    description: 'Generate and manage leads'
+  },
+  {
+    label: 'Campaigns',
+    href: '/campaigns',
+    icon: <CampaignIcon />,
+    badge: 3,
+    description: 'Email marketing campaigns'
+  },
+  {
+    label: 'Customers',
+    href: '/customers',
+    icon: <PeopleIcon />,
+    description: 'Customer management'
+  },
+  {
+    label: 'Properties',
+    href: '/properties',
+    icon: <BusinessIcon />,
+    description: 'Property database'
+  },
+  {
+    label: 'Projects',
+    href: '/projects',
+    icon: <ProjectIcon />,
+    description: 'Active and completed projects'
+  },
+  {
+    label: 'Debug Console',
+    href: '/debug',
+    icon: <SettingsIcon />,
+    description: 'API connectivity debug tools'
+  },
+];
+
+interface AppLayoutProps {
+  children: React.ReactNode;
+  title?: string;
+}
+
+export default function AppLayout({ children, title = 'Smart Home CRM' }: AppLayoutProps) {
+  const router = useRouter();
+  const theme = useTheme();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const isActivePath = (href: string) => {
+    if (href === '/') {
+      return router.pathname === '/';
+    }
+    return router.pathname.startsWith(href);
+  };
+
+  const drawer = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Logo/Brand */}
+      <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
+        <Typography variant="h5" fontWeight="bold" color="primary">
+          Smart Home CRM
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Customer Relationship Management
+        </Typography>
+      </Box>
+
+      {/* Navigation */}
+      <List sx={{ flex: 1, py: 2 }}>
+        {navigationItems.map((item) => (
+          <ListItem key={item.href} disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              component={Link}
+              href={item.href}
+              selected={isActivePath(item.href)}
+              sx={{
+                mx: 2,
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  color: theme.palette.primary.main,
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                  },
+                },
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.action.hover, 0.8),
+                },
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  color: 'inherit',
+                  minWidth: 40,
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={item.label}
+                secondary={item.description}
+                primaryTypographyProps={{
+                  fontSize: '0.95rem',
+                  fontWeight: isActivePath(item.href) ? 600 : 400,
+                }}
+                secondaryTypographyProps={{
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                }}
+              />
+              {item.badge && (
+                <Chip
+                  label={item.badge}
+                  size="small"
+                  color="primary"
+                  sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
+                />
+              )}
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      {/* Bottom Section */}
+      <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, p: 2 }}>
+        <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            href="/settings"
+            sx={{ borderRadius: 2 }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Settings" />
+          </ListItemButton>
+        </ListItem>
+      </Box>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+      {/* App Bar */}
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          ml: { md: `${DRAWER_WIDTH}px` },
+          backgroundColor: 'background.paper',
+          color: 'text.primary',
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { md: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            {title}
+          </Typography>
+
+          {/* Header Actions */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton color="inherit">
+              <NotificationsIcon />
+            </IconButton>
+            
+            <IconButton
+              onClick={handleUserMenuOpen}
+              color="inherit"
+            >
+              <Avatar sx={{ width: 32, height: 32 }}>
+                <AccountCircle />
+              </Avatar>
+            </IconButton>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      {/* User Menu */}
+      <Menu
+        anchorEl={userMenuAnchor}
+        open={Boolean(userMenuAnchor)}
+        onClose={handleUserMenuClose}
+        onClick={handleUserMenuClose}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            mt: 1.5,
+            minWidth: 200,
+          },
+        }}
+      >
+        <MenuItem>
+          <Avatar sx={{ mr: 2, width: 24, height: 24 }}>
+            <AccountCircle />
+          </Avatar>
+          Profile
+        </MenuItem>
+        <MenuItem>
+          <SettingsIcon sx={{ mr: 2, width: 24, height: 24 }} />
+          Settings
+        </MenuItem>
+        <Divider />
+        <MenuItem>
+          <LogoutIcon sx={{ mr: 2, width: 24, height: 24 }} />
+          Logout
+        </MenuItem>
+      </Menu>
+
+      {/* Navigation Drawer */}
+      <Box
+        component="nav"
+        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
+      >
+        {/* Mobile drawer */}
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: DRAWER_WIDTH,
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+
+        {/* Desktop drawer */}
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: DRAWER_WIDTH,
+              borderRight: `1px solid ${theme.palette.divider}`,
+            },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+
+      {/* Main Content */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          height: '100vh',
+          overflow: 'auto',
+        }}
+      >
+        <Toolbar /> {/* Spacer for fixed AppBar */}
+        <Box sx={{ flex: 1, minHeight: 'calc(100vh - 64px)' }}>
+          {children}
+        </Box>
+      </Box>
+    </Box>
+  );
+} 
