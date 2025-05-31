@@ -45,6 +45,9 @@ import {
   TableSortLabel,
   FormControlLabel,
   Switch,
+  Badge,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -67,10 +70,18 @@ import {
   BarChart as BarChartIcon,
   FileDownload as FileDownloadIcon,
   FilterList as FilterListIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Group as GroupIcon,
+  Task as TaskIcon,
 } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useRouter } from 'next/router';
-import { getProjectById, Project } from '../../utils/dataStorage';
+import { getProjectById, Project, saveProject, generateId } from '../../utils/dataStorage';
+import InlineEditField from '../../components/common/InlineEditField';
+import TaskManager, { Task } from '../../components/common/TaskManager';
+import EmployeeSelector from '../../components/common/EmployeeSelector';
+import { Employee } from '../../utils/employeeStorage';
 
 interface Expense {
   id: string;
@@ -108,16 +119,26 @@ function TabPanel(props: TabPanelProps) {
 export default function ProjectDetailPage() {
   const router = useRouter();
   const { id } = router.query;
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   
   // Dialog states
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [editExpenseOpen, setEditExpenseOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [employeeSelectorOpen, setEmployeeSelectorOpen] = useState(false);
   
   // Menu states
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -138,6 +159,226 @@ export default function ProjectDetailPage() {
     receiptNumber: '',
     notes: '',
   });
+
+  // Sample employees data - in real app, this would come from API
+  const [employees] = useState<Employee[]>([
+    {
+      id: 'emp1',
+      personalInfo: {
+        firstName: 'Sarah',
+        lastName: 'Williams',
+        email: 'sarah@company.com',
+        phone: '(555) 0123',
+      },
+      employment: {
+        employeeId: 'EMP001',
+        title: 'Lead Installer',
+        department: 'Installation',
+        role: 'Lead Installer',
+        hireDate: '2022-03-15',
+        employmentType: 'Full Time',
+        status: 'Active'
+      },
+      compensation: {
+        hourlyRate: 85,
+        payType: 'Hourly'
+      },
+      skills: {
+        certifications: ['Control4 Certified', 'Lutron Certified'],
+        specialties: ['Control4', 'Lutron', 'Network Setup', 'Audio Systems', 'Security'],
+        skillLevel: 'Expert',
+        yearsExperience: 8
+      },
+      availability: {
+        schedule: {
+          monday: { start: '08:00', end: '17:00', available: true },
+          tuesday: { start: '08:00', end: '17:00', available: true },
+          wednesday: { start: '08:00', end: '17:00', available: true },
+          thursday: { start: '08:00', end: '17:00', available: true },
+          friday: { start: '08:00', end: '17:00', available: true },
+          saturday: { start: '09:00', end: '15:00', available: true },
+          sunday: { start: '00:00', end: '00:00', available: false }
+        },
+        timeOff: [],
+        availableForTravel: true
+      },
+      performance: {
+        rating: 4.9,
+        completedProjects: 127,
+        customerSatisfaction: 4.8
+      },
+      currentAssignments: {
+        activeProjects: ['proj1', 'proj2'],
+        nextAvailable: '2024-02-15'
+      },
+      metadata: {
+        createdAt: '2022-03-15T10:00:00Z',
+        createdBy: 'admin',
+        lastModified: '2024-01-15T14:30:00Z',
+        modifiedBy: 'admin'
+      }
+    },
+    {
+      id: 'emp2',
+      personalInfo: {
+        firstName: 'Mike',
+        lastName: 'Chen',
+        email: 'mike@company.com',
+        phone: '(555) 0456',
+      },
+      employment: {
+        employeeId: 'EMP002',
+        title: 'Project Manager',
+        department: 'Management',
+        role: 'Project Manager',
+        hireDate: '2021-08-01',
+        employmentType: 'Full Time',
+        status: 'Active'
+      },
+      compensation: {
+        salary: 95000,
+        payType: 'Salary'
+      },
+      skills: {
+        certifications: ['PMP Certified', 'Control4 Certified'],
+        specialties: ['Project Management', 'Control4', 'Network Setup', 'Client Relations'],
+        skillLevel: 'Expert',
+        yearsExperience: 12
+      },
+      availability: {
+        schedule: {
+          monday: { start: '07:30', end: '17:30', available: true },
+          tuesday: { start: '07:30', end: '17:30', available: true },
+          wednesday: { start: '07:30', end: '17:30', available: true },
+          thursday: { start: '07:30', end: '17:30', available: true },
+          friday: { start: '07:30', end: '17:30', available: true },
+          saturday: { start: '00:00', end: '00:00', available: false },
+          sunday: { start: '00:00', end: '00:00', available: false }
+        },
+        timeOff: [],
+        availableForTravel: true
+      },
+      performance: {
+        rating: 4.7,
+        completedProjects: 89,
+        customerSatisfaction: 4.6
+      },
+      currentAssignments: {
+        activeProjects: ['proj1', 'proj3', 'proj4'],
+        nextAvailable: '2024-02-20'
+      },
+      metadata: {
+        createdAt: '2021-08-01T09:00:00Z',
+        createdBy: 'admin',
+        lastModified: '2024-01-10T16:20:00Z',
+        modifiedBy: 'admin'
+      }
+    },
+    {
+      id: 'emp3',
+      personalInfo: {
+        firstName: 'Tom',
+        lastName: 'Rodriguez',
+        email: 'tom@company.com',
+        phone: '(555) 0789',
+      },
+      employment: {
+        employeeId: 'EMP003',
+        title: 'Audio Specialist',
+        department: 'Installation',
+        role: 'Technician',
+        hireDate: '2023-01-10',
+        employmentType: 'Part Time',
+        status: 'Active'
+      },
+      compensation: {
+        hourlyRate: 75,
+        payType: 'Hourly'
+      },
+      skills: {
+        certifications: ['Audio Engineering', 'Sonos Certified'],
+        specialties: ['Audio Systems', 'Theater Systems', 'Sonos', 'Speaker Installation'],
+        skillLevel: 'Advanced',
+        yearsExperience: 5
+      },
+      availability: {
+        schedule: {
+          monday: { start: '10:00', end: '18:00', available: true },
+          tuesday: { start: '10:00', end: '18:00', available: true },
+          wednesday: { start: '10:00', end: '18:00', available: true },
+          thursday: { start: '00:00', end: '00:00', available: false },
+          friday: { start: '10:00', end: '18:00', available: true },
+          saturday: { start: '09:00', end: '15:00', available: true },
+          sunday: { start: '00:00', end: '00:00', available: false }
+        },
+        timeOff: [],
+        availableForTravel: false
+      },
+      performance: {
+        rating: 4.8,
+        completedProjects: 45,
+        customerSatisfaction: 4.9
+      },
+      currentAssignments: {
+        activeProjects: ['proj1'],
+        nextAvailable: '2024-02-05'
+      },
+      metadata: {
+        createdAt: '2023-01-10T11:00:00Z',
+        createdBy: 'admin',
+        lastModified: '2024-01-05T15:45:00Z',
+        modifiedBy: 'admin'
+      }
+    },
+  ]);
+
+  // Sample tasks data - in real app, this would come from project data
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      id: 'task1',
+      name: 'Site survey and planning',
+      description: 'Initial site visit and system planning',
+      category: 'Planning',
+      status: 'Complete',
+      priority: 'High',
+      assignedTo: 'emp2',
+      assignedToName: 'Mike Chen',
+      dueDate: '2024-01-15',
+      estimatedHours: 4,
+      actualHours: 3.5,
+      progress: 100,
+      createdAt: '2024-01-10',
+      completedAt: '2024-01-15',
+    },
+    {
+      id: 'task2',
+      name: 'Install bedroom speakers',
+      description: 'Install and configure speakers in master bedroom',
+      category: 'Installation',
+      status: 'Not Started',
+      priority: 'High',
+      assignedTo: 'emp3',
+      assignedToName: 'Tom Rodriguez',
+      dueDate: '2024-01-25',
+      estimatedHours: 2,
+      createdAt: '2024-01-20',
+    },
+    {
+      id: 'task3',
+      name: 'Configure Control4 system',
+      description: 'Set up and configure main control system',
+      category: 'Installation',
+      status: 'In Progress',
+      priority: 'Medium',
+      assignedTo: 'emp1',
+      assignedToName: 'Sarah Williams',
+      dueDate: '2024-01-30',
+      estimatedHours: 6,
+      actualHours: 2,
+      progress: 45,
+      createdAt: '2024-01-18',
+    },
+  ]);
 
   // Sample expenses data - in real app, this would come from the project data
   const [expenses, setExpenses] = useState<Expense[]>([
@@ -223,9 +464,7 @@ export default function ProjectDetailPage() {
     const pendingExpenses = expenses.filter(exp => !exp.approved).reduce((sum, exp) => sum + exp.amount, 0);
     
     const grossProfit = contractAmount - approvedExpenses;
-    const projectedProfit = contractAmount - totalExpenses;
     const profitMargin = contractAmount > 0 ? (grossProfit / contractAmount) * 100 : 0;
-    const projectedMargin = contractAmount > 0 ? (projectedProfit / contractAmount) * 100 : 0;
 
     // Category breakdown
     const categoryTotals = expenses.reduce((acc, exp) => {
@@ -239,9 +478,7 @@ export default function ProjectDetailPage() {
       approvedExpenses,
       pendingExpenses,
       grossProfit,
-      projectedProfit,
       profitMargin,
-      projectedMargin,
       categoryTotals,
     };
   }, [project, expenses]);
@@ -259,12 +496,14 @@ export default function ProjectDetailPage() {
   }, [expenses, expenseFilter, searchTerm, showApprovedOnly]);
 
   const handleAddExpense = () => {
+    if (!newExpense.description || !newExpense.amount) return;
+    
     const expense: Expense = {
-      id: `exp${Date.now()}`,
+      id: generateId('exp'),
       date: new Date().toISOString().split('T')[0],
-      description: newExpense.description || '',
+      description: newExpense.description,
       category: newExpense.category as Expense['category'],
-      amount: newExpense.amount || 0,
+      amount: newExpense.amount,
       vendor: newExpense.vendor || '',
       receiptNumber: newExpense.receiptNumber,
       approved: false,
@@ -299,9 +538,9 @@ export default function ProjectDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'Complete': return 'success';
+      case 'Not Started': return 'info';
       case 'In Progress': return 'primary';
-      case 'Completed': return 'success';
-      case 'Planning': return 'info';
       case 'On Hold': return 'warning';
       case 'Cancelled': return 'error';
       default: return 'default';
@@ -328,6 +567,95 @@ export default function ProjectDetailPage() {
       'Other': '#616161'
     };
     return colors[category] || '#616161';
+  };
+
+  // Project editing functions
+  const handleProjectSave = async (field: string, value: string | number) => {
+    if (!project) return;
+    
+    setIsSaving(true);
+    try {
+      const updatedProject = {
+        ...project,
+        [field]: value,
+        lastUpdate: new Date().toISOString().split('T')[0],
+      };
+      
+      setProject(updatedProject);
+      saveProject(updatedProject);
+      setLastSaved(new Date());
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditModeToggle = () => {
+    if (isEditMode && hasUnsavedChanges) {
+      // Show confirmation dialog if there are unsaved changes
+      const confirmLeave = window.confirm('You have unsaved changes. Are you sure you want to exit edit mode?');
+      if (!confirmLeave) return;
+    }
+    setIsEditMode(!isEditMode);
+    setHasUnsavedChanges(false);
+  };
+
+  // Task management functions
+  const handleTaskUpdate = async (task: Task) => {
+    setTasks(tasks.map(t => t.id === task.id ? task : t));
+  };
+
+  const handleTaskCreate = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
+    const newTask: Task = {
+      ...taskData,
+      id: generateId('task'),
+      createdAt: new Date().toISOString(),
+    };
+    setTasks([...tasks, newTask]);
+  };
+
+  const handleTaskDelete = async (taskId: string) => {
+    setTasks(tasks.filter(t => t.id !== taskId));
+  };
+
+  const handleTaskReorder = async (reorderedTasks: Task[]) => {
+    setTasks(reorderedTasks);
+  };
+
+  // Employee assignment functions
+  const handleEmployeeAssign = (employee: Employee, role?: string) => {
+    if (!project) return;
+    
+    const updatedProject = {
+      ...project,
+      team: [...project.team, employee.id],
+      lastUpdate: new Date().toISOString().split('T')[0],
+    };
+    
+    setProject(updatedProject);
+    saveProject(updatedProject);
+    setEmployeeSelectorOpen(false);
+  };
+
+  const validateProjectField = (field: string, value: string | number): string | null => {
+    switch (field) {
+      case 'name':
+        return !value || value.toString().trim() === '' ? 'Project name is required' : null;
+      case 'budget':
+        return typeof value === 'number' && value < 0 ? 'Budget cannot be negative' : null;
+      case 'endDate':
+        if (project?.startDate && value) {
+          const startDate = new Date(project.startDate);
+          const endDate = new Date(value.toString());
+          return endDate < startDate ? 'End date cannot be before start date' : null;
+        }
+        return null;
+      default:
+        return null;
+    }
   };
 
   if (loading) {
@@ -378,32 +706,129 @@ export default function ProjectDetailPage() {
             <IconButton onClick={() => router.push('/projects')} sx={{ mr: 2 }}>
               <ArrowBackIcon />
             </IconButton>
-            <Box>
-              <Typography variant="h4" component="h1" gutterBottom>
-                {project.name}
-              </Typography>
-              <Typography variant="body1" color="text.secondary" gutterBottom>
-                {project.description}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                <Chip
-                  label={project.status}
-                  size="small"
-                  color={getStatusColor(project.status) as any}
+            <Box sx={{ flex: 1 }}>
+              {isEditMode ? (
+                <InlineEditField
+                  value={project.name}
+                  onSave={(value) => handleProjectSave('name', value)}
+                  type="text"
+                  placeholder="Project name"
+                  validation={(value) => validateProjectField('name', value)}
+                  required
                 />
-                <Chip
-                  label={`${project.priority} Priority`}
-                  size="small"
-                  color={getPriorityColor(project.priority) as any}
+              ) : (
+                <Typography variant="h4" component="h1" gutterBottom>
+                  {project.name}
+                </Typography>
+              )}
+              
+              {isEditMode ? (
+                <InlineEditField
+                  value={project.description}
+                  onSave={(value) => handleProjectSave('description', value)}
+                  type="multiline"
+                  placeholder="Project description"
+                  maxRows={3}
                 />
+              ) : (
+                <Typography variant="body1" color="text.secondary" gutterBottom>
+                  {project.description}
+                </Typography>
+              )}
+              
+              <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
+                {isEditMode ? (
+                  <>
+                    <InlineEditField
+                      value={project.status}
+                      onSave={(value) => handleProjectSave('status', value)}
+                      type="select"
+                      options={['Planning', 'In Progress', 'Completed', 'On Hold', 'Cancelled']}
+                    />
+                    <InlineEditField
+                      value={project.priority}
+                      onSave={(value) => handleProjectSave('priority', value)}
+                      type="select"
+                      options={['High', 'Medium', 'Low']}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Chip
+                      label={project.status}
+                      size="small"
+                      color={getStatusColor(project.status) as any}
+                    />
+                    <Chip
+                      label={`${project.priority} Priority`}
+                      size="small"
+                      color={getPriorityColor(project.priority) as any}
+                    />
+                  </>
+                )}
+                
+                {/* Edit mode indicators */}
+                {isEditMode && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+                    {isSaving && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <CircularProgress size={16} />
+                        <Typography variant="caption" color="text.secondary">
+                          Saving...
+                        </Typography>
+                      </Box>
+                    )}
+                    {lastSaved && !isSaving && (
+                      <Typography variant="caption" color="success.main">
+                        Saved {lastSaved.toLocaleTimeString()}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
               </Box>
             </Box>
           </Box>
         </Box>
+        
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditProjectOpen(true)}>
-            Edit Project
-          </Button>
+          {isEditMode ? (
+            <>
+              <Button 
+                variant="contained" 
+                color="success"
+                startIcon={<SaveIcon />}
+                onClick={handleEditModeToggle}
+                disabled={isSaving}
+              >
+                Save & Exit
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<CancelIcon />}
+                onClick={handleEditModeToggle}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="outlined" 
+                startIcon={<EditIcon />} 
+                onClick={handleEditModeToggle}
+              >
+                Edit Project
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<GroupIcon />}
+                onClick={() => setEmployeeSelectorOpen(true)}
+              >
+                Add Team Member
+              </Button>
+            </>
+          )}
           <IconButton onClick={(e) => setMenuAnchor(e.currentTarget)}>
             <MoreVertIcon />
           </IconButton>
@@ -483,9 +908,9 @@ export default function ProjectDetailPage() {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
           <Tab label="Overview" />
+          <Tab label="Tasks & Team" />
           <Tab label="Expense Tracking" />
           <Tab label="Financial Analysis" />
-          <Tab label="Team & Tasks" />
         </Tabs>
 
         {/* Overview Tab */}
@@ -497,56 +922,126 @@ export default function ProjectDetailPage() {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <PersonIcon sx={{ mr: 2 }} />
-                <Box>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2" color="text.secondary">Customer</Typography>
-                  <Typography variant="body1">{project.customer}</Typography>
+                  {isEditMode ? (
+                    <InlineEditField
+                      value={project.customer}
+                      onSave={(value) => handleProjectSave('customer', value)}
+                      type="text"
+                      placeholder="Customer name"
+                    />
+                  ) : (
+                    <Typography variant="body1">{project.customer}</Typography>
+                  )}
                 </Box>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <LocationIcon sx={{ mr: 2 }} />
-                <Box>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2" color="text.secondary">Property</Typography>
-                  <Typography variant="body1">{project.property}</Typography>
+                  {isEditMode ? (
+                    <InlineEditField
+                      value={project.property}
+                      onSave={(value) => handleProjectSave('property', value)}
+                      type="text"
+                      placeholder="Property address"
+                    />
+                  ) : (
+                    <Typography variant="body1">{project.property}</Typography>
+                  )}
                 </Box>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <CalendarIcon sx={{ mr: 2 }} />
-                <Box>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2" color="text.secondary">Timeline</Typography>
-                  <Typography variant="body1">{project.startDate} - {project.endDate}</Typography>
+                  {isEditMode ? (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <InlineEditField
+                        value={project.startDate}
+                        onSave={(value) => handleProjectSave('startDate', value)}
+                        type="text"
+                        placeholder="Start date"
+                      />
+                      <Typography variant="body2">to</Typography>
+                      <InlineEditField
+                        value={project.endDate}
+                        onSave={(value) => handleProjectSave('endDate', value)}
+                        type="text"
+                        placeholder="End date"
+                        validation={(value) => validateProjectField('endDate', value)}
+                      />
+                    </Box>
+                  ) : (
+                    <Typography variant="body1">{project.startDate} - {project.endDate}</Typography>
+                  )}
                 </Box>
               </Box>
             </Grid>
             
             <Grid item xs={12} md={6}>
               <Typography variant="h6" gutterBottom>
-                Budget Breakdown
+                Budget Overview
               </Typography>
-              {financialMetrics && Object.entries(financialMetrics.categoryTotals).map(([category, amount]) => (
-                <Box key={category} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box 
-                      sx={{ 
-                        width: 12, 
-                        height: 12, 
-                        borderRadius: '50%', 
-                        bgcolor: getCategoryColor(category),
-                        mr: 1 
-                      }} 
-                    />
-                    <Typography variant="body2">{category}</Typography>
-                  </Box>
-                  <Typography variant="body2" fontWeight="bold">
-                    {formatCurrency(amount)}
+              {isEditMode ? (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Contract Amount
                   </Typography>
+                  <InlineEditField
+                    value={project.projectData?.contractAmount || 0}
+                    onSave={(value) => handleProjectSave('budget', value)}
+                    type="currency"
+                    placeholder="Contract amount"
+                    validation={(value) => validateProjectField('budget', value)}
+                  />
                 </Box>
-              ))}
+              ) : (
+                financialMetrics && Object.entries(financialMetrics.categoryTotals).map(([category, amount]) => (
+                  <Box key={category} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box 
+                        sx={{ 
+                          width: 12, 
+                          height: 12, 
+                          borderRadius: '50%', 
+                          bgcolor: getCategoryColor(category),
+                          mr: 1 
+                        }} 
+                      />
+                      <Typography variant="body2">{category}</Typography>
+                    </Box>
+                    <Typography variant="body2" fontWeight="bold">
+                      {formatCurrency(amount)}
+                    </Typography>
+                  </Box>
+                ))
+              )}
             </Grid>
           </Grid>
         </TabPanel>
 
-        {/* Expense Tracking Tab */}
+        {/* Tasks & Team Tab */}
         <TabPanel value={tabValue} index={1}>
+          <TaskManager
+            projectId={project.id}
+            tasks={tasks}
+            onTaskUpdate={handleTaskUpdate}
+            onTaskCreate={handleTaskCreate}
+            onTaskDelete={handleTaskDelete}
+            onTaskReorder={handleTaskReorder}
+            employees={employees.map(emp => ({
+              id: emp.id,
+              name: `${emp.personalInfo.firstName} ${emp.personalInfo.lastName}`,
+              avatar: emp.personalInfo.avatar
+            }))}
+            readonly={false}
+          />
+        </TabPanel>
+
+        {/* Expense Tracking Tab */}
+        <TabPanel value={tabValue} index={2}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h6">Expense Ledger</Typography>
             <Button 
@@ -619,16 +1114,7 @@ export default function ProjectDetailPage() {
                 {filteredExpenses.map((expense) => (
                   <TableRow key={expense.id}>
                     <TableCell>{expense.date}</TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">{expense.description}</Typography>
-                        {expense.receiptNumber && (
-                          <Typography variant="caption" color="text.secondary">
-                            Receipt: {expense.receiptNumber}
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
+                    <TableCell>{expense.description}</TableCell>
                     <TableCell>
                       <Chip 
                         size="small" 
@@ -687,7 +1173,7 @@ export default function ProjectDetailPage() {
         </TabPanel>
 
         {/* Financial Analysis Tab */}
-        <TabPanel value={tabValue} index={2}>
+        <TabPanel value={tabValue} index={3}>
           <Typography variant="h6" gutterBottom>
             Financial Performance
           </Typography>
@@ -705,8 +1191,8 @@ export default function ProjectDetailPage() {
                   </Box>
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">Projected Margin (with pending)</Typography>
-                    <Typography variant="h5" color={financialMetrics.projectedMargin >= 0 ? 'success.main' : 'error.main'}>
-                      {financialMetrics.projectedMargin.toFixed(1)}%
+                    <Typography variant="h5" color={financialMetrics.profitMargin >= 0 ? 'success.main' : 'error.main'}>
+                      {financialMetrics.profitMargin.toFixed(1)}%
                     </Typography>
                   </Box>
                   <Divider sx={{ my: 2 }} />
@@ -756,48 +1242,6 @@ export default function ProjectDetailPage() {
               </Grid>
             </Grid>
           )}
-        </TabPanel>
-
-        {/* Team & Tasks Tab */}
-        <TabPanel value={tabValue} index={3}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" gutterBottom>Team Members</Typography>
-              <List>
-                {project.team.map((member, index) => (
-                  <ListItem key={index}>
-                    <Avatar sx={{ mr: 2 }}>
-                      {member.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <ListItemText primary={member} secondary="Team Member" />
-                  </ListItem>
-                ))}
-              </List>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" gutterBottom>Project Tasks</Typography>
-              <List>
-                {project.tasks.map((task, index) => (
-                  <ListItem key={index} divider={index < project.tasks.length - 1}>
-                    <ListItemIcon>
-                      {task.status === 'Completed' ? (
-                        <CheckCircleIcon color="success" />
-                      ) : task.status === 'In Progress' ? (
-                        <ScheduleIcon color="primary" />
-                      ) : (
-                        <WarningIcon color="warning" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={task.name}
-                      secondary={`Status: ${task.status}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Grid>
-          </Grid>
         </TabPanel>
       </Paper>
 
@@ -886,7 +1330,7 @@ export default function ProjectDetailPage() {
       >
         <MenuItem onClick={() => handleApproveExpense(selectedExpenseId)}>
           <CheckCircleIcon sx={{ mr: 2 }} />
-          {expenses.find(exp => exp.id === selectedExpenseId)?.approved ? 'Unapprove' : 'Approve'}
+          {expenses.find(exp => exp.id === selectedExpenseId)?.approved ? 'Uncomplete' : 'Complete'}
         </MenuItem>
         <MenuItem onClick={() => setEditExpenseOpen(true)}>
           <EditIcon sx={{ mr: 2 }} />
@@ -927,6 +1371,19 @@ export default function ProjectDetailPage() {
       >
         <AddIcon />
       </Fab>
+
+      {/* Employee Selector */}
+      <EmployeeSelector
+        open={employeeSelectorOpen}
+        onClose={() => setEmployeeSelectorOpen(false)}
+        onSelect={handleEmployeeAssign}
+        employees={employees}
+        requiredSkills={['Control4', 'Lutron', 'Audio', 'Network']}
+        projectId={project?.id}
+        title="Assign Team Member"
+        subtitle={`Project: ${project?.name}`}
+        selectedEmployees={project?.team || []}
+      />
     </Container>
   );
 } 

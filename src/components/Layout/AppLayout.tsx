@@ -31,6 +31,7 @@ import {
   Menu as MenuIcon,
   AccountCircle,
   Logout as LogoutIcon,
+  Group as GroupIcon,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -70,6 +71,13 @@ const navigationItems: NavigationItem[] = [
     href: '/customers',
     icon: <PeopleIcon />,
     description: 'Customer management'
+  },
+  {
+    label: 'Employees',
+    href: '/employees',
+    icon: <GroupIcon />,
+    badge: 5,
+    description: 'Team management and workforce'
   },
   {
     label: 'Properties',
