@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test for Smart Home CRM</title>
+</head>
+<body>
+    <h1>Smart Home CRM - CORS Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testCORS() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing API connection...</p>';
+            
+            try {
+                // Test API connection
+                const response = await fetch('http://localhost:3001/api/customers?summary=true');
+                const data = await response.json();
+                
+                resultsDiv.innerHTML = `
+                    <h2>✅ SUCCESS! CORS is working!</h2>
+                    <h3>API Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <p><strong>Total Customers:</strong> ${data.totalCustomers}</p>
+                    <p><strong>Active Customers:</strong> ${data.activeCustomers}</p>
+                    <p><strong>Recent Projects:</strong> ${data.recentProjects}</p>
+                    <p><strong>Completed Projects:</strong> ${data.completedProjects}</p>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h2>❌ CORS Error!</h2>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>This indicates CORS is still blocking the request.</p>
+                `;
+            }
+        }
+        
+        // Test immediately when page loads
+        testCORS();
+    </script>
+</body>
+</html> 

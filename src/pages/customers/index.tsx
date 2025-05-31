@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -17,22 +17,13 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   FormControl,
   InputLabel,
   Select,
   Divider,
   Badge,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -40,301 +31,125 @@ import {
   FilterList as FilterIcon,
   MoreVert as MoreVertIcon,
   Person as PersonIcon,
-  Business as BusinessIcon,
   Phone as PhoneIcon,
   Email as EmailIcon,
+  Star as StarIcon,
+  AttachMoney as MoneyIcon,
+  TrendingUp as TrendingUpIcon,
   LocationOn as LocationIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as ViewIcon,
-  Star as StarIcon,
-  Assignment as ProjectIcon,
-  Home as PropertyIcon,
-  TrendingUp as TrendingUpIcon,
-  ViewList as ViewListIcon,
-  ViewModule as ViewModuleIcon,
-  Schedule as ScheduleIcon,
-  RequestQuote as RequestQuoteIcon,
-  Reviews as ReviewsIcon,
-  Share as ReferralIcon,
-  Build as BuildIcon,
-  Timeline as TimelineIcon,
-  MonetizationOn as MoneyIcon,
-  Settings as SettingsIcon,
-  Campaign as CampaignIcon,
-  ThumbUp as ThumbUpIcon,
-  EventAvailable as EventIcon,
-  AttachMoney as AttachMoneyIcon,
-  ContactSupport as ContactIcon,
 } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useRouter } from 'next/router';
-import RevenueAnalytics from '../../components/RevenueAnalytics';
+import { getCustomers, getProjects, Customer, Project } from '../../utils/dataStorage';
 
-// Enhanced mock past clients data (completed projects only)
-const mockPastClients = [
+// Sample mock customers for demonstration
+const mockCustomers: Customer[] = [
   {
-    id: 1,
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    company: null,
-    title: 'Homeowner',
-    email: 'sarah.johnson@email.com',
-    phone: '(555) 123-4567',
-    address: '1234 Oak Street, Beverly Hills, CA 90210',
-    projectStatus: 'Completed',
-    customerType: 'Individual',
-    lifetimeValue: '$85,500',
-    projectsCompleted: 2,
-    totalSystemsInstalled: 1,
-    lastContact: '2024-01-15',
-    lastContactMethod: 'Email Follow-up',
-    projectCompletionDate: '2023-11-15',
-    installAnniversary: '2023-08-15',
-    referralSource: 'Industry Partner - Interior Designer',
-    referralsGenerated: 2,
-    referralRevenue: '$43,000',
-    warrantyStatus: 'Active (2 years remaining)',
-    maintenanceSchedule: '2024-03-15',
-    expansionOpportunity: 'High - Interested in outdoor automation',
-    communicationPreference: 'Email',
-    tags: ['Premium Client', 'Referral Source', 'Expansion Ready'],
-    notes: 'Installed complete Control4 system. Very satisfied, generated 2 referrals.',
-    systemBrands: ['Control4', 'Lutron', 'Ring'],
-    serviceLevel: 'Premium Maintenance',
-    nextMaintenanceDue: '2024-02-15',
-    satisfactionScore: 9.5,
-    lastReviewDate: '2023-12-01',
-    googleReviewStatus: 'Submitted 5-star review'
-  },
-  {
-    id: 2,
-    firstName: 'Michael',
-    lastName: 'Chen',
-    company: 'Chen Family',
-    title: 'Homeowner',
-    email: 'm.chen@email.com',
+    id: 'cust_mock_001',
+    name: 'Sarah Mitchell',
+    company: 'Mitchell Consulting Group',
     phone: '(555) 234-5678',
-    address: '5678 Pine Avenue, Manhattan Beach, CA 90266',
-    projectStatus: 'Completed',
-    customerType: 'Individual',
-    lifetimeValue: '$62,300',
-    projectsCompleted: 1,
-    totalSystemsInstalled: 1,
-    lastContact: '2024-01-14',
-    lastContactMethod: 'Phone Call',
-    projectCompletionDate: '2023-12-20',
-    installAnniversary: '2023-12-20',
-    referralSource: 'Google Search',
-    referralsGenerated: 1,
-    referralRevenue: '$28,500',
-    warrantyStatus: 'Active (2.8 years remaining)',
-    maintenanceSchedule: '2024-06-20',
-    expansionOpportunity: 'Medium - Pool automation interest',
-    communicationPreference: 'Text Message',
-    tags: ['Energy Efficient', 'Tech Savvy', 'Recent Install'],
-    notes: 'Modern family system with Ecobee and smart lighting. Very tech-oriented.',
-    systemBrands: ['Ecobee', 'Philips Hue', 'Sonos'],
-    serviceLevel: 'Standard Maintenance',
-    nextMaintenanceDue: '2024-03-20',
-    satisfactionScore: 9.2,
-    lastReviewDate: '2024-01-05',
-    googleReviewStatus: 'Pending request'
-  },
-  {
-    id: 3,
-    firstName: 'Jennifer',
-    lastName: 'Martinez',
-    company: 'Riverside Business Park',
-    title: 'Facilities Manager',
-    email: 'j.martinez@rbpark.com',
-    phone: '(555) 345-6789',
-    address: '9012 Business Blvd, Newport Beach, CA 92660',
-    projectStatus: 'Completed',
-    customerType: 'Business',
-    lifetimeValue: '$145,800',
-    projectsCompleted: 1,
-    totalSystemsInstalled: 1,
+    email: 'sarah@mitchellconsulting.com',
+    address: '123 Business Park Drive, Tech City, TC 12345',
+    vipStatus: true,
+    lifetimeValue: 185000,
+    projectHistory: ['proj_mock_001'],
+    source: 'Referral',
+    addedDate: '2023-08-15',
     lastContact: '2024-01-10',
-    lastContactMethod: 'In-person Meeting',
-    projectCompletionDate: '2023-09-30',
-    installAnniversary: '2023-06-15',
-    referralSource: 'Direct Marketing Campaign',
-    referralsGenerated: 0,
-    referralRevenue: '$0',
-    warrantyStatus: 'Active (1.5 years remaining)',
-    maintenanceSchedule: '2024-02-20',
-    expansionOpportunity: 'High - Additional building automation',
-    communicationPreference: 'Email + Phone',
-    tags: ['Commercial', 'High Value', 'Expansion Potential'],
-    notes: 'Office automation system. Considering expansion to second building.',
-    systemBrands: ['Crestron', 'Honeywell', 'Cisco'],
-    serviceLevel: 'Commercial Maintenance',
-    nextMaintenanceDue: '2024-02-20',
-    satisfactionScore: 8.8,
-    lastReviewDate: '2023-10-15',
-    googleReviewStatus: 'Submitted 4-star review'
+    completedProjects: 2,
+    referralRevenue: 45000,
+    satisfaction: 9.2,
   },
   {
-    id: 4,
-    firstName: 'Robert',
-    lastName: 'Williams',
-    company: null,
-    title: 'Retiree',
-    email: 'r.williams@email.com',
-    phone: '(555) 456-7890',
-    address: '3456 Elder Lane, Santa Monica, CA 90401',
-    projectStatus: 'Completed',
-    customerType: 'Individual',
-    lifetimeValue: '$34,200',
-    projectsCompleted: 1,
-    totalSystemsInstalled: 1,
-    lastContact: '2024-01-12',
-    lastContactMethod: 'Service Visit',
-    projectCompletionDate: '2023-07-20',
-    installAnniversary: '2023-07-20',
-    referralSource: 'Client Referral - Sarah Johnson',
-    referralsGenerated: 0,
-    referralRevenue: '$0',
-    warrantyStatus: 'Active (2.3 years remaining)',
-    maintenanceSchedule: '2024-07-20',
-    expansionOpportunity: 'Low - Complete system',
-    communicationPreference: 'Phone',
-    tags: ['Senior Client', 'Security Focused', 'Maintenance Client'],
-    notes: 'Security-focused installation. Referred by Sarah Johnson.',
-    systemBrands: ['Ring', 'Honeywell'],
-    serviceLevel: 'Basic Maintenance',
-    nextMaintenanceDue: '2024-04-20',
-    satisfactionScore: 9.8,
-    lastReviewDate: '2023-08-15',
-    googleReviewStatus: 'Not requested (prefers phone)'
-  },
-  {
-    id: 5,
-    firstName: 'Amanda',
-    lastName: 'Davis',
-    company: 'Davis Construction',
-    title: 'Business Owner',
-    email: 'a.davis@davisconstruction.com',
-    phone: '(555) 567-8901',
-    address: '7890 University Drive, Irvine, CA 92612',
-    projectStatus: 'Completed',
-    customerType: 'Business',
-    lifetimeValue: '$78,900',
-    projectsCompleted: 2,
-    totalSystemsInstalled: 2,
-    lastContact: '2024-01-11',
-    lastContactMethod: 'Email',
-    projectCompletionDate: '2023-10-15',
-    installAnniversary: '2023-05-10',
-    referralSource: 'Industry Partner - Real Estate Agent',
-    referralsGenerated: 3,
-    referralRevenue: '$95,400',
-    warrantyStatus: 'Active (1.8 years remaining)',
-    maintenanceSchedule: '2024-05-10',
-    expansionOpportunity: 'Medium - Home office expansion',
-    communicationPreference: 'Email',
-    tags: ['Business Owner', 'Multiple Projects', 'Top Referrer'],
-    notes: 'Office + home systems. Excellent referral source for other contractors.',
-    systemBrands: ['Ring', 'Nest', 'TP-Link'],
-    serviceLevel: 'Premium Maintenance',
-    nextMaintenanceDue: '2024-02-10',
-    satisfactionScore: 9.7,
-    lastReviewDate: '2023-11-01',
-    googleReviewStatus: 'Submitted 5-star review'
-  },
-  {
-    id: 6,
-    firstName: 'David',
-    lastName: 'Thompson',
-    company: 'Thompson Properties',
-    title: 'Property Investor',
-    email: 'd.thompson@thompsonprop.com',
-    phone: '(555) 678-9012',
-    address: '1111 Investment Blvd, Riverside, CA 92506',
-    projectStatus: 'Completed',
-    customerType: 'Business',
-    lifetimeValue: '$125,600',
-    projectsCompleted: 3,
-    totalSystemsInstalled: 3,
+    id: 'cust_mock_002',
+    name: 'David Chen',
+    company: 'Chen Family Trust',
+    phone: '(555) 345-6789',
+    email: 'david.chen.trust@email.com',
+    address: '456 Luxury Lane, Premium Heights, PH 54321',
+    vipStatus: false,
+    lifetimeValue: 89000,
+    projectHistory: ['proj_mock_002'],
+    source: 'Online Marketing',
+    addedDate: '2023-11-22',
     lastContact: '2023-12-15',
-    lastContactMethod: 'Text Message',
-    projectCompletionDate: '2023-08-30',
-    installAnniversary: '2022-03-15',
-    referralSource: 'Industry Partner - Contractor',
-    referralsGenerated: 1,
-    referralRevenue: '$18,900',
-    warrantyStatus: 'Expired (eligible for extended warranty)',
-    maintenanceSchedule: 'On-demand',
-    expansionOpportunity: 'High - Additional rental properties',
-    communicationPreference: 'Text',
-    tags: ['Investment Properties', 'Multiple Projects', 'Warranty Renewal'],
-    notes: 'Rental property systems. Interested in more properties but price-sensitive.',
-    systemBrands: ['ADT', 'Basic Security'],
-    serviceLevel: 'Basic Maintenance',
-    nextMaintenanceDue: 'Overdue',
-    satisfactionScore: 7.8,
-    lastReviewDate: '2023-09-15',
-    googleReviewStatus: 'No review'
-  }
+    completedProjects: 1,
+    referralRevenue: 0,
+    satisfaction: 8.5,
+  },
+  {
+    id: 'cust_mock_003',
+    name: 'Maria Rodriguez',
+    company: 'Rodriguez Properties LLC',
+    phone: '(555) 456-7890',
+    email: 'maria@rodriguezproperties.com',
+    address: '789 Investment Boulevard, Capital District, CD 67890',
+    vipStatus: true,
+    lifetimeValue: 320000,
+    projectHistory: ['proj_mock_003', 'proj_mock_004'],
+    source: 'Direct Business',
+    addedDate: '2023-05-10',
+    lastContact: '2024-01-08',
+    completedProjects: 3,
+    referralRevenue: 125000,
+    satisfaction: 9.8,
+  },
 ];
 
 export default function CustomersPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState('All');
-  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [sourceFilter, setSourceFilter] = useState('All');
+  const [vipFilter, setVipFilter] = useState('All');
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [newCustomerDialog, setNewCustomerDialog] = useState(false);
-  const [revenueAnalyticsOpen, setRevenueAnalyticsOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
 
-  // Helper functions for status filtering
-  const isMaintenanceDue = (customer: any) => {
-    if (customer.nextMaintenanceDue === 'Overdue') return true;
-    
-    // Check if maintenance is due within next 30 days
-    if (customer.nextMaintenanceDue && customer.nextMaintenanceDue !== 'Overdue') {
-      try {
-        const maintenanceDate = new Date(customer.nextMaintenanceDue);
-        const today = new Date();
-        const daysUntilMaintenance = Math.ceil((maintenanceDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
-        return daysUntilMaintenance <= 30 && daysUntilMaintenance >= 0;
-      } catch (e) {
-        return false;
-      }
-    }
-    return false;
+  // Load customers and projects on component mount
+  useEffect(() => {
+    loadCustomers();
+    loadProjects();
+  }, []);
+
+  const loadCustomers = () => {
+    const storedCustomers = getCustomers();
+    // Merge mock customers with stored customers (filter out duplicates)
+    const combinedCustomers = [
+      ...storedCustomers,
+      ...mockCustomers.filter(mockCustomer => 
+        !storedCustomers.some(stored => stored.id === mockCustomer.id)
+      )
+    ];
+    setAllCustomers(combinedCustomers);
   };
 
-  const isWarrantyExpired = (customer: any) => {
-    return customer.warrantyStatus.toLowerCase().includes('expired');
+  const loadProjects = () => {
+    const projects = getProjects();
+    setAllProjects(projects);
   };
 
   // Filter customers based on search and filters
-  const filteredCustomers = mockPastClients.filter(customer => {
+  const filteredCustomers = allCustomers.filter(customer => {
     const matchesSearch = 
-      customer.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.company && customer.company.toLowerCase().includes(searchTerm.toLowerCase()));
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Updated status filtering logic
-    let matchesStatus = true;
-    if (statusFilter === 'Maintenance Due') {
-      matchesStatus = isMaintenanceDue(customer);
-    } else if (statusFilter === 'Warranty Expired') {
-      matchesStatus = isWarrantyExpired(customer);
-    }
-    // 'All' and other values show all customers
+    const matchesSource = sourceFilter === 'All' || customer.source === sourceFilter;
+    const matchesVip = vipFilter === 'All' || 
+      (vipFilter === 'VIP' && customer.vipStatus) ||
+      (vipFilter === 'Regular' && !customer.vipStatus);
     
-    const matchesType = typeFilter === 'All' || customer.customerType === typeFilter;
-    
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesSearch && matchesSource && matchesVip;
   });
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, customer: any) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, customer: Customer) => {
     setMenuAnchor(event.currentTarget);
     setSelectedCustomer(customer);
   };
@@ -344,33 +159,28 @@ export default function CustomersPage() {
     setSelectedCustomer(null);
   };
 
-  const getSatisfactionColor = (score: number) => {
-    if (score >= 9.0) return 'success';
-    if (score >= 8.0) return 'warning';
-    return 'error';
+  const getCustomerProjects = (customer: Customer) => {
+    return allProjects.filter(project => 
+      customer.projectHistory.includes(project.id)
+    );
   };
 
-  const getPastClientStats = () => {
-    const total = mockPastClients.length;
-    const totalRevenue = mockPastClients.reduce((sum, c) => {
-      const value = parseFloat(c.lifetimeValue.replace(/[$,]/g, ''));
-      return sum + value;
-    }, 0);
-    const totalReferralRevenue = mockPastClients.reduce((sum, c) => {
-      const value = parseFloat(c.referralRevenue.replace(/[$,]/g, ''));
-      return sum + value;
-    }, 0);
-    const avgSatisfaction = mockPastClients.reduce((sum, c) => sum + c.satisfactionScore, 0) / mockPastClients.length;
+  const getCustomerStats = () => {
+    const total = allCustomers.length;
+    const vipCustomers = allCustomers.filter(c => c.vipStatus).length;
+    const totalLifetimeValue = allCustomers.reduce((sum, c) => sum + c.lifetimeValue, 0);
+    const avgSatisfaction = allCustomers.length > 0 
+      ? allCustomers.reduce((sum, c) => sum + c.satisfaction, 0) / allCustomers.length 
+      : 0;
     
-    return { 
-      total, 
-      totalRevenue: `$${totalRevenue.toLocaleString()}`, 
-      totalReferralRevenue: `$${totalReferralRevenue.toLocaleString()}`,
-      avgSatisfaction: avgSatisfaction.toFixed(1)
-    };
+    return { total, vipCustomers, totalLifetimeValue, avgSatisfaction };
   };
 
-  const stats = getPastClientStats();
+  const stats = getCustomerStats();
+
+  const getCustomerInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -379,60 +189,35 @@ export default function CustomersPage() {
         <Link component={NextLink} href="/" color="inherit" underline="hover">
           Dashboard
         </Link>
-        <Typography color="text.primary">Past Clients</Typography>
+        <Typography color="text.primary">Customers</Typography>
       </Breadcrumbs>
 
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom>
-            Past Client Relationship Management
+            Customer Management
             <Chip 
-              label={`${filteredCustomers.length} clients`} 
+              label={`${filteredCustomers.length} customers`} 
               size="small" 
               color="primary" 
               sx={{ ml: 2 }} 
             />
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Manage relationships and maximize revenue from completed projects
+            Manage relationships with smart home clients
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Box sx={{ display: 'flex', border: 1, borderColor: 'divider', borderRadius: 1 }}>
-            <Button
-              variant={viewMode === 'card' ? 'contained' : 'text'}
-              startIcon={<ViewModuleIcon />}
-              onClick={() => setViewMode('card')}
-              size="small"
-              sx={{ borderRadius: '4px 0 0 4px' }}
-            >
-              Cards
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'contained' : 'text'}
-              startIcon={<ViewListIcon />}
-              onClick={() => setViewMode('list')}
-              size="small"
-              sx={{ borderRadius: '0 4px 4px 0' }}
-            >
-              List
-            </Button>
-          </Box>
-          <Button 
-            variant="outlined" 
-            startIcon={<FilterIcon />}
-            onClick={() => setRevenueAnalyticsOpen(true)}
-          >
-            Revenue Analytics
+          <Button variant="outlined" startIcon={<FilterIcon />}>
+            Advanced Filters
           </Button>
           <Button 
             variant="contained" 
             startIcon={<AddIcon />}
-            onClick={() => setNewCustomerDialog(true)}
             size="large"
           >
-            Add Past Client
+            Add Customer
           </Button>
         </Box>
       </Box>
@@ -448,7 +233,7 @@ export default function CustomersPage() {
                     {stats.total}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Past Clients
+                    Total Customers
                   </Typography>
                 </Box>
                 <PersonIcon sx={{ fontSize: 40, color: 'primary.main' }} />
@@ -462,14 +247,34 @@ export default function CustomersPage() {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="h4" color="success.main">
-                    {stats.totalRevenue}
+                  <Typography variant="h4" color="warning.main">
+                    {stats.vipCustomers}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Total Revenue
+                    VIP Customers
                   </Typography>
                 </Box>
-                <AttachMoneyIcon sx={{ fontSize: 40, color: 'success.main' }} />
+                <Badge badgeContent="VIP" color="warning">
+                  <StarIcon sx={{ fontSize: 40, color: 'warning.main' }} />
+                </Badge>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" color="success.main">
+                    ${(stats.totalLifetimeValue / 1000).toFixed(0)}K
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Lifetime Value
+                  </Typography>
+                </Box>
+                <MoneyIcon sx={{ fontSize: 40, color: 'success.main' }} />
               </Box>
             </CardContent>
           </Card>
@@ -481,31 +286,13 @@ export default function CustomersPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h4" color="info.main">
-                    {stats.totalReferralRevenue}
+                    {stats.avgSatisfaction.toFixed(1)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Referral Revenue
+                    Avg Satisfaction
                   </Typography>
                 </Box>
-                <ReferralIcon sx={{ fontSize: 40, color: 'info.main' }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h4" color="warning.main">
-                    {stats.avgSatisfaction}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Avg. Satisfaction
-                  </Typography>
-                </Box>
-                <StarIcon sx={{ fontSize: 40, color: 'warning.main' }} />
+                <TrendingUpIcon sx={{ fontSize: 40, color: 'info.main' }} />
               </Box>
             </CardContent>
           </Card>
@@ -518,7 +305,7 @@ export default function CustomersPage() {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              placeholder="Search clients..."
+              placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -533,49 +320,53 @@ export default function CustomersPage() {
           
           <Grid item xs={12} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
+              <InputLabel>Source</InputLabel>
               <Select
-                value={statusFilter}
-                label="Status"
-                onChange={(e) => setStatusFilter(e.target.value)}
+                value={sourceFilter}
+                label="Source"
+                onChange={(e) => setSourceFilter(e.target.value)}
               >
-                <MenuItem value="All">All Clients</MenuItem>
-                <MenuItem value="Maintenance Due">Maintenance Due (30 days)</MenuItem>
-                <MenuItem value="Warranty Expired">Warranty Expired</MenuItem>
+                <MenuItem value="All">All Sources</MenuItem>
+                <MenuItem value="Referral">Referral</MenuItem>
+                <MenuItem value="Online Marketing">Online Marketing</MenuItem>
+                <MenuItem value="Direct Business">Direct Business</MenuItem>
+                <MenuItem value="Social Media">Social Media</MenuItem>
+                <MenuItem value="Trade Show">Trade Show</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
           <Grid item xs={12} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Type</InputLabel>
+              <InputLabel>Customer Type</InputLabel>
               <Select
-                value={typeFilter}
-                label="Type"
-                onChange={(e) => setTypeFilter(e.target.value)}
+                value={vipFilter}
+                label="Customer Type"
+                onChange={(e) => setVipFilter(e.target.value)}
               >
-                <MenuItem value="All">All Types</MenuItem>
-                <MenuItem value="Business">Business</MenuItem>
-                <MenuItem value="Individual">Individual</MenuItem>
+                <MenuItem value="All">All Customers</MenuItem>
+                <MenuItem value="VIP">VIP Customers</MenuItem>
+                <MenuItem value="Regular">Regular Customers</MenuItem>
               </Select>
             </FormControl>
           </Grid>
         </Grid>
       </Paper>
 
-      {/* Customer Cards or List View */}
+      {/* Customer Cards */}
       <Paper sx={{ mb: 4 }}>
         <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
           <Typography variant="h6">
-            Clients ({filteredCustomers.length})
+            Customers ({filteredCustomers.length})
           </Typography>
         </Box>
         
-        {viewMode === 'card' ? (
-          // Card View
-          <Grid container spacing={3} sx={{ p: 3 }}>
-            {filteredCustomers.map((customer) => (
-              <Grid item xs={12} md={6} lg={4} key={customer.id}>
+        <Grid container spacing={3} sx={{ p: 3 }}>
+          {filteredCustomers.map((customer) => {
+            const customerProjects = getCustomerProjects(customer);
+            
+            return (
+              <Grid item xs={12} lg={6} key={customer.id}>
                 <Card 
                   sx={{ 
                     cursor: 'pointer',
@@ -590,22 +381,26 @@ export default function CustomersPage() {
                   <CardContent>
                     {/* Customer Header */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar 
-                          sx={{ 
-                            bgcolor: customer.customerType === 'Business' ? 'primary.main' : 'secondary.main',
-                            mr: 2 
-                          }}
-                        >
-                          {customer.customerType === 'Business' ? <BusinessIcon /> : <PersonIcon />}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                        <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56 }}>
+                          {getCustomerInitials(customer.name)}
                         </Avatar>
                         <Box>
-                          <Typography variant="h6">
-                            {customer.firstName} {customer.lastName}
+                          <Typography variant="h6" gutterBottom>
+                            {customer.name}
+                            {customer.vipStatus && (
+                              <Chip 
+                                label="VIP" 
+                                size="small" 
+                                color="warning" 
+                                sx={{ ml: 1 }}
+                                icon={<StarIcon />}
+                              />
+                            )}
                           </Typography>
                           {customer.company && (
-                            <Typography variant="body2" color="text.secondary">
-                              {customer.title} at {customer.company}
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              {customer.company}
                             </Typography>
                           )}
                         </Box>
@@ -621,315 +416,119 @@ export default function CustomersPage() {
                       </IconButton>
                     </Box>
 
-                    {/* Status and Satisfaction */}
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                      <Chip
-                        label={`${customer.satisfactionScore}/10 Satisfaction`}
-                        size="small"
-                        color={getSatisfactionColor(customer.satisfactionScore) as any}
-                        icon={<StarIcon />}
-                      />
-                      {customer.referralsGenerated > 0 && (
-                        <Chip
-                          label={`${customer.referralsGenerated} Referrals`}
-                          size="small"
-                          color="info"
-                          icon={<ReferralIcon />}
-                        />
-                      )}
-                    </Box>
-
-                    {/* Contact Info */}
+                    {/* Contact Information */}
                     <Box sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                        <EmailIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <EmailIcon fontSize="small" color="action" />
                         <Typography variant="body2">{customer.email}</Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                        <PhoneIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <PhoneIcon fontSize="small" color="action" />
                         <Typography variant="body2">{customer.phone}</Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <LocationIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body2" noWrap>{customer.address}</Typography>
-                      </Box>
-                    </Box>
-
-                    {/* Revenue & Referral Stats */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="primary">
-                          {customer.lifetimeValue}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Lifetime Value
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="success.main">
-                          {customer.referralRevenue}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Referral Revenue
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="info.main">
-                          {customer.projectsCompleted}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Projects
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    {/* Smart Home System Info */}
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        <strong>Installed:</strong> {customer.installAnniversary} • <strong>Source:</strong> {customer.referralSource.split(' - ')[0]}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        <strong>Brands:</strong> {customer.systemBrands.slice(0, 2).join(', ')}
-                        {customer.systemBrands.length > 2 && ` +${customer.systemBrands.length - 2} more`}
-                      </Typography>
-                      <Typography variant="body2" color={customer.warrantyStatus.includes('Active') ? 'success.main' : 'warning.main'}>
-                        <strong>Warranty:</strong> {customer.warrantyStatus}
-                      </Typography>
-                    </Box>
-
-                    {/* Quick Action Buttons */}
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<ReferralIcon />}
-                        sx={{ flex: 1 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Handle referral request
-                        }}
-                      >
-                        Request Referral
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<ReviewsIcon />}
-                        sx={{ flex: 1 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Handle review request
-                        }}
-                      >
-                        Request Review
-                      </Button>
-                    </Box>
-
-                    {/* Tags and Communication Preference */}
-                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
-                      {customer.tags.slice(0, 2).map((tag, index) => (
-                        <Chip key={index} label={tag} size="small" variant="outlined" />
-                      ))}
-                      {customer.tags.length > 2 && (
-                        <Chip label={`+${customer.tags.length - 2}`} size="small" variant="outlined" />
+                      {customer.address && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <LocationIcon fontSize="small" color="action" />
+                          <Typography variant="body2" noWrap>
+                            {customer.address}
+                          </Typography>
+                        </Box>
                       )}
                     </Box>
 
-                    {/* Last Contact & Next Action */}
+                    {/* Customer Metrics */}
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      <Grid item xs={4}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="h6" color="success.main">
+                            ${(customer.lifetimeValue / 1000).toFixed(0)}K
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Lifetime Value
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="h6" color="primary">
+                            {customer.completedProjects}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Projects
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="h6" color="warning.main">
+                            {customer.satisfaction.toFixed(1)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Satisfaction
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Project History Preview */}
+                    {customerProjects.length > 0 && (
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Recent Projects:
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {customerProjects.slice(0, 2).map((project) => (
+                            <Chip 
+                              key={project.id}
+                              label={project.name} 
+                              size="small" 
+                              variant="outlined"
+                              color={project.status === 'Completed' ? 'success' : 'primary'}
+                            />
+                          ))}
+                          {customerProjects.length > 2 && (
+                            <Chip 
+                              label={`+${customerProjects.length - 2}`} 
+                              size="small" 
+                              variant="outlined" 
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Source and Last Contact */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip 
+                        label={customer.source} 
+                        size="small" 
+                        variant="outlined" 
+                        color="info"
+                      />
                       <Typography variant="caption" color="text.secondary">
-                        Last: {customer.lastContact} ({customer.lastContactMethod})
-                      </Typography>
-                      <Typography variant="caption" color={customer.nextMaintenanceDue === 'Overdue' ? 'error.main' : 'success.main'} sx={{ fontWeight: 'medium' }}>
-                        Next maintenance: {customer.nextMaintenanceDue}
+                        Last contact: {customer.lastContact}
                       </Typography>
                     </Box>
                   </CardContent>
                 </Card>
               </Grid>
-            ))}
-          </Grid>
-        ) : (
-          // List/Table View
-          <TableContainer>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Client</TableCell>
-                  <TableCell>Contact Info</TableCell>
-                  <TableCell>Address</TableCell>
-                  <TableCell align="right">Lifetime Value</TableCell>
-                  <TableCell align="right">Referral Revenue</TableCell>
-                  <TableCell>Last Contact</TableCell>
-                  <TableCell>Next Maintenance</TableCell>
-                  <TableCell>Warranty Status</TableCell>
-                  <TableCell>Source</TableCell>
-                  <TableCell align="center">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow 
-                    key={customer.id}
-                    hover
-                    sx={{ 
-                      cursor: 'pointer',
-                      '&:hover': { backgroundColor: 'action.hover' }
-                    }}
-                    onClick={() => router.push(`/customers/${customer.id}`)}
-                  >
-                    {/* Client Column */}
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar 
-                          sx={{ 
-                            bgcolor: customer.customerType === 'Business' ? 'primary.main' : 'secondary.main',
-                            mr: 2,
-                            width: 32,
-                            height: 32
-                          }}
-                        >
-                          {customer.customerType === 'Business' ? <BusinessIcon fontSize="small" /> : <PersonIcon fontSize="small" />}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" fontWeight="bold">
-                            {customer.firstName} {customer.lastName}
-                          </Typography>
-                          {customer.company && (
-                            <Typography variant="caption" color="text.secondary">
-                              {customer.title} at {customer.company}
-                            </Typography>
-                          )}
-                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                            <Chip
-                              label={`${customer.satisfactionScore}/10`}
-                              size="small"
-                              color={getSatisfactionColor(customer.satisfactionScore) as any}
-                            />
-                            {customer.referralsGenerated > 0 && (
-                              <Chip
-                                label={`${customer.referralsGenerated} ref`}
-                                size="small"
-                                color="info"
-                              />
-                            )}
-                          </Box>
-                        </Box>
-                      </Box>
-                    </TableCell>
+            );
+          })}
+        </Grid>
 
-                    {/* Contact Info Column */}
-                    <TableCell>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                          <EmailIcon sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
-                          <Typography variant="body2">{customer.email}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
-                          <Typography variant="body2">{customer.phone}</Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-
-                    {/* Address Column */}
-                    <TableCell>
-                      <Typography variant="body2">{customer.address}</Typography>
-                    </TableCell>
-
-                    {/* Lifetime Value Column */}
-                    <TableCell align="right">
-                      <Typography variant="body2" fontWeight="bold" color="primary">
-                        {customer.lifetimeValue}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Referral Revenue Column */}
-                    <TableCell align="right">
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        {customer.referralRevenue}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Last Contact Column */}
-                    <TableCell>
-                      <Typography variant="body2">{customer.lastContact}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        ({customer.lastContactMethod})
-                      </Typography>
-                    </TableCell>
-
-                    {/* Next Maintenance Column */}
-                    <TableCell>
-                      <Typography 
-                        variant="body2" 
-                        color={customer.nextMaintenanceDue === 'Overdue' ? 'error.main' : 'text.primary'}
-                        fontWeight={customer.nextMaintenanceDue === 'Overdue' ? 'bold' : 'normal'}
-                      >
-                        {customer.nextMaintenanceDue}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Warranty Status Column */}
-                    <TableCell>
-                      <Typography 
-                        variant="body2" 
-                        color={customer.warrantyStatus.includes('Active') ? 'success.main' : 'warning.main'}
-                      >
-                        {customer.warrantyStatus}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Source Column */}
-                    <TableCell>
-                      <Typography variant="body2">
-                        {customer.referralSource.split(' - ')[0]}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Actions Column */}
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Button
-                          variant="text"
-                          size="small"
-                          startIcon={<ReferralIcon />}
-                          sx={{ minWidth: 'auto', px: 1 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Handle referral request
-                          }}
-                        >
-                          Referral
-                        </Button>
-                        <Button
-                          variant="text"
-                          size="small"
-                          startIcon={<ReviewsIcon />}
-                          sx={{ minWidth: 'auto', px: 1 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Handle review request
-                          }}
-                        >
-                          Review
-                        </Button>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMenuOpen(e, customer);
-                          }}
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        {filteredCustomers.length === 0 && (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <PersonIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No customers found
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {searchTerm || sourceFilter !== 'All' || vipFilter !== 'All' 
+                ? 'Try adjusting your search criteria or filters.'
+                : 'Customers from completed projects will appear here automatically.'
+              }
+            </Typography>
+          </Box>
         )}
       </Paper>
 
@@ -944,56 +543,34 @@ export default function CustomersPage() {
           handleMenuClose();
         }}>
           <ViewIcon sx={{ mr: 1 }} />
-          View Client Details
+          View Profile
         </MenuItem>
         <MenuItem onClick={handleMenuClose}>
-          <ReferralIcon sx={{ mr: 1 }} />
-          Request Referral
+          <EditIcon sx={{ mr: 1 }} />
+          Edit Customer
         </MenuItem>
         <MenuItem onClick={handleMenuClose}>
-          <ReviewsIcon sx={{ mr: 1 }} />
-          Request Google Review
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <ScheduleIcon sx={{ mr: 1 }} />
-          Schedule Maintenance
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <BuildIcon sx={{ mr: 1 }} />
-          System Expansion Quote
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <ContactIcon sx={{ mr: 1 }} />
-          Update Contact Info
+          <EmailIcon sx={{ mr: 1 }} />
+          Send Email
         </MenuItem>
         <Divider />
         <MenuItem onClick={handleMenuClose} sx={{ color: 'error.main' }}>
           <DeleteIcon sx={{ mr: 1 }} />
-          Archive Client
+          Remove Customer
         </MenuItem>
       </Menu>
 
-      {/* New Customer Dialog */}
-      <Dialog open={newCustomerDialog} onClose={() => setNewCustomerDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Add New Client</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Create a new client record in your CRM system.
-          </Typography>
-          {/* Add form fields here */}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNewCustomerDialog(false)}>Cancel</Button>
-          <Button variant="contained">Add Client</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Revenue Analytics Dialog */}
-      <RevenueAnalytics
-        open={revenueAnalyticsOpen}
-        onClose={() => setRevenueAnalyticsOpen(false)}
-        clientData={filteredCustomers}
-      />
+      {/* Success Message */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={() => setSuccessMessage('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 } 

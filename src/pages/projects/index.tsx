@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -31,6 +31,8 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -52,15 +54,27 @@ import {
   Pause as PauseIcon,
   AttachMoney as MoneyIcon,
   CalendarToday as CalendarIcon,
+  Done as DoneIcon,
 } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useRouter } from 'next/router';
+import NewProjectWizard from '../../components/NewProjectWizard';
+import ProjectCompletionModal from '../../components/ProjectCompletionModal';
+import { 
+  getProjects, 
+  saveProject, 
+  markProjectComplete,
+  convertWizardDataToProject,
+  initializeDataIfEmpty,
+  Project
+} from '../../utils/dataStorage';
 
-// Mock projects data
-const mockProjects = [
+// Mock projects data - will be merged with real data
+const mockProjects: Project[] = [
   {
-    id: 1,
+    id: 'proj_mock_001',
     name: 'Green Valley Smart Security System',
+    type: 'security',
     description: 'Complete smart security system installation for 150-unit apartment complex',
     customer: 'Green Valley Estates',
     property: 'Green Valley Estates Complex',
@@ -81,10 +95,12 @@ const mockProjects = [
     ],
     tags: ['Smart Security', 'Large Scale', 'Commercial'],
     lastUpdate: '2024-01-15',
+    createdDate: '2024-01-01',
   },
   {
-    id: 2,
+    id: 'proj_mock_002',
     name: 'Sunset Homes Energy Management',
+    type: 'energy',
     description: 'Smart thermostats and energy monitoring system for 75 residential properties',
     customer: 'Sunset Residential Group',
     property: 'Sunset Residential Properties',
@@ -105,10 +121,12 @@ const mockProjects = [
     ],
     tags: ['Energy Management', 'Residential', 'Multi-Property'],
     lastUpdate: '2024-01-14',
+    createdDate: '2024-01-14',
   },
   {
-    id: 3,
+    id: 'proj_mock_003',
     name: 'Riverside Office Smart Building',
+    type: 'automation',
     description: 'Complete smart building automation for office complex renovation',
     customer: 'Riverside Commercial Inc.',
     property: 'Riverside Business Park',
@@ -129,34 +147,12 @@ const mockProjects = [
     ],
     tags: ['Commercial', 'Building Automation', 'On Hold'],
     lastUpdate: '2023-12-20',
+    createdDate: '2023-12-20',
   },
   {
-    id: 4,
-    name: 'Heritage Health Monitoring System',
-    description: 'Advanced health monitoring and emergency alert system for senior living facility',
-    customer: 'Heritage Senior Communities',
-    property: 'Heritage Senior Living',
-    status: 'Completed',
-    priority: 'High',
-    startDate: '2023-10-01',
-    endDate: '2023-12-31',
-    budget: '$158,000',
-    spent: '$152,000',
-    progress: 100,
-    team: ['Dr. Patricia Moore', 'Carlos Mendez', 'Lisa Chang'],
-    tasks: [
-      { name: 'Medical Requirements Review', status: 'Completed' },
-      { name: 'System Design', status: 'Completed' },
-      { name: 'Installation & Setup', status: 'Completed' },
-      { name: 'Staff Training', status: 'Completed' },
-      { name: 'Go-Live & Support', status: 'Completed' }
-    ],
-    tags: ['Healthcare', 'Senior Living', 'Emergency Systems'],
-    lastUpdate: '2024-01-05',
-  },
-  {
-    id: 5,
+    id: 'proj_mock_004',
     name: 'University Smart Campus Access',
+    type: 'access_control',
     description: 'Keyless entry and access control system for student housing complex',
     customer: 'University Housing Partners',
     property: 'University Heights Apartments',
@@ -177,10 +173,12 @@ const mockProjects = [
     ],
     tags: ['Access Control', 'Student Housing', 'Campus'],
     lastUpdate: '2024-01-13',
+    createdDate: '2024-01-10',
   },
   {
-    id: 6,
+    id: 'proj_mock_005',
     name: 'Thompson Property Upgrade',
+    type: 'smart_home',
     description: 'Basic smart home retrofits for mixed-use development',
     customer: 'Thompson Properties LLC',
     property: 'Thompson Investment Properties',
@@ -201,6 +199,7 @@ const mockProjects = [
     ],
     tags: ['Retrofit', 'Cancelled', 'Budget Constraints'],
     lastUpdate: '2023-11-25',
+    createdDate: '2023-11-01',
   },
 ];
 
@@ -210,11 +209,32 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [newProjectDialog, setNewProjectDialog] = useState(false);
+  const [completionDialog, setCompletionDialog] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+
+  // Load projects on component mount
+  useEffect(() => {
+    initializeDataIfEmpty();
+    loadProjects();
+  }, []);
+
+  const loadProjects = () => {
+    const storedProjects = getProjects();
+    // Merge mock projects with stored projects (filter out duplicates)
+    const combinedProjects = [
+      ...storedProjects,
+      ...mockProjects.filter(mockProject => 
+        !storedProjects.some(stored => stored.id === mockProject.id)
+      )
+    ];
+    setAllProjects(combinedProjects);
+  };
 
   // Filter projects based on search and filters
-  const filteredProjects = mockProjects.filter(project => {
+  const filteredProjects = allProjects.filter(project => {
     const matchesSearch = 
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -226,7 +246,7 @@ export default function ProjectsPage() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, project: any) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, project: Project) => {
     setMenuAnchor(event.currentTarget);
     setSelectedProject(project);
   };
@@ -234,6 +254,53 @@ export default function ProjectsPage() {
   const handleMenuClose = () => {
     setMenuAnchor(null);
     setSelectedProject(null);
+  };
+
+  const handleProjectCreated = (projectData: any) => {
+    console.log('New project created:', projectData);
+    
+    // Convert wizard data to project format
+    const newProject = convertWizardDataToProject(projectData);
+    
+    // Save to localStorage
+    saveProject(newProject);
+    
+    // Reload projects to show the new one
+    loadProjects();
+    
+    // Close dialog and show success message
+    setNewProjectDialog(false);
+    setSuccessMessage(`Project "${newProject.name}" created successfully!`);
+    
+    // Optionally redirect to the new project page after a delay
+    setTimeout(() => {
+      if (window.confirm('Would you like to view the new project details?')) {
+        router.push(`/projects/${newProject.id}`);
+      }
+    }, 2000);
+  };
+
+  const handleMarkComplete = (project: Project) => {
+    setSelectedProject(project);
+    setCompletionDialog(true);
+    handleMenuClose();
+  };
+
+  const handleProjectCompleted = (projectId: string, completionData: any) => {
+    const customer = markProjectComplete(projectId, completionData);
+    
+    // Reload projects to reflect the completion
+    loadProjects();
+    
+    // Show success message
+    const project = allProjects.find(p => p.id === projectId);
+    setSuccessMessage(
+      `Project "${project?.name}" completed successfully!${
+        customer ? ` Customer "${customer.name}" added to your database.` : ''
+      }`
+    );
+    
+    setCompletionDialog(false);
   };
 
   const getStatusColor = (status: string) => {
@@ -268,10 +335,10 @@ export default function ProjectsPage() {
   };
 
   const getProjectStats = () => {
-    const total = mockProjects.length;
-    const inProgress = mockProjects.filter(p => p.status === 'In Progress').length;
-    const completed = mockProjects.filter(p => p.status === 'Completed').length;
-    const totalBudget = mockProjects.reduce((sum, p) => sum + parseFloat(p.budget.replace(/[$,]/g, '')), 0);
+    const total = allProjects.length;
+    const inProgress = allProjects.filter(p => p.status === 'In Progress').length;
+    const completed = allProjects.filter(p => p.status === 'Completed').length;
+    const totalBudget = allProjects.reduce((sum, p) => sum + parseFloat(p.budget.replace(/[$,]/g, '')), 0);
     
     return { total, inProgress, completed, totalBudget };
   };
@@ -605,6 +672,12 @@ export default function ProjectsPage() {
           <EditIcon sx={{ mr: 1 }} />
           Edit Project
         </MenuItem>
+        {selectedProject && selectedProject.status !== 'Completed' && selectedProject.status !== 'Cancelled' && (
+          <MenuItem onClick={() => handleMarkComplete(selectedProject)}>
+            <DoneIcon sx={{ mr: 1 }} />
+            Mark Complete
+          </MenuItem>
+        )}
         <MenuItem onClick={handleMenuClose}>
           <CalendarIcon sx={{ mr: 1 }} />
           Update Timeline
@@ -620,20 +693,32 @@ export default function ProjectsPage() {
         </MenuItem>
       </Menu>
 
-      {/* New Project Dialog */}
-      <Dialog open={newProjectDialog} onClose={() => setNewProjectDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create New Project</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Start a new smart home installation project.
-          </Typography>
-          {/* Add form fields here */}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNewProjectDialog(false)}>Cancel</Button>
-          <Button variant="contained">Create Project</Button>
-        </DialogActions>
-      </Dialog>
+      {/* New Project Wizard */}
+      <NewProjectWizard
+        open={newProjectDialog}
+        onClose={() => setNewProjectDialog(false)}
+        onSubmit={handleProjectCreated}
+      />
+
+      {/* Project Completion Modal */}
+      <ProjectCompletionModal
+        open={completionDialog}
+        project={selectedProject}
+        onClose={() => setCompletionDialog(false)}
+        onComplete={handleProjectCompleted}
+      />
+
+      {/* Success Message */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={() => setSuccessMessage('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 } 
