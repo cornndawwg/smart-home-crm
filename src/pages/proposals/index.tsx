@@ -43,16 +43,21 @@ interface Proposal {
   name: string;
   description: string;
   customerPersona: string;
-  pricingTier: string;
   status: string;
   totalAmount: number;
   validUntil: string | null;
   createdAt: string;
+  isExistingCustomer: boolean;
   customer?: {
     firstName: string;
     lastName: string;
     company?: string;
   };
+  prospectName?: string;
+  prospectCompany?: string;
+  prospectEmail?: string;
+  prospectPhone?: string;
+  prospectStatus?: string;
   items: {
     name: string;
     quantity: number;
@@ -112,15 +117,6 @@ export default function ProposalsPage() {
       case 'accepted': return 'success';
       case 'rejected': return 'error';
       case 'expired': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case 'good': return 'success';
-      case 'better': return 'primary';
-      case 'best': return 'error';
       default: return 'default';
     }
   };
@@ -258,7 +254,6 @@ export default function ProposalsPage() {
                   <TableCell>Proposal</TableCell>
                   <TableCell>Customer</TableCell>
                   <TableCell>Persona</TableCell>
-                  <TableCell>Tier</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="right">Amount</TableCell>
                   <TableCell>Created</TableCell>
@@ -294,12 +289,12 @@ export default function ProposalsPage() {
                         <Typography variant="body2">
                           {proposal.customer ? 
                             `${proposal.customer.firstName} ${proposal.customer.lastName}` : 
-                            'Unknown Customer'
+                            (proposal.prospectName || 'Unknown Prospect')
                           }
                         </Typography>
-                        {proposal.customer?.company && (
+                        {(proposal.customer?.company || proposal.prospectCompany) && (
                           <Typography variant="caption" color="text.secondary">
-                            {proposal.customer.company}
+                            {proposal.customer?.company || proposal.prospectCompany}
                           </Typography>
                         )}
                       </Box>
@@ -308,13 +303,6 @@ export default function ProposalsPage() {
                       <Typography variant="body2">
                         {proposal.customerPersona}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={proposal.pricingTier.toUpperCase()}
-                        color={getTierColor(proposal.pricingTier) as any}
-                        size="small"
-                      />
                     </TableCell>
                     <TableCell>
                       <Chip

@@ -139,10 +139,15 @@ interface Property {
 interface FormData {
   name: string;
   description: string;
+  isExistingCustomer: boolean;
   customerId: string;
+  prospectName: string;
+  prospectCompany: string;
+  prospectEmail: string;
+  prospectPhone: string;
   propertyId?: string;
+  projectType: 'residential' | 'commercial';
   customerPersona: string;
-  pricingTier: 'good' | 'better' | 'best';
   validUntil?: string;
   voiceTranscript?: string;
   items: ProposalItem[];
@@ -154,12 +159,6 @@ interface VoiceToTextState {
   interimTranscript: string;
   error: string | null;
 }
-
-const PRICING_TIERS = [
-  { value: 'good', label: 'Good', color: 'success', description: 'Essential features at competitive price' },
-  { value: 'better', label: 'Better', color: 'primary', description: 'Enhanced features with professional service' },
-  { value: 'best', label: 'Best', color: 'error', description: 'Premium features with white-glove service' }
-];
 
 const PRODUCT_CATEGORIES = [
   'audio-video', 'lighting', 'security', 'networking', 'climate', 'access-control', 'other'
@@ -226,10 +225,15 @@ export default function CreateProposalPage() {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
+    isExistingCustomer: true,
     customerId: (customerId as string) || '',
+    prospectName: '',
+    prospectCompany: '',
+    prospectEmail: '',
+    prospectPhone: '',
     propertyId: propertyId as string,
+    projectType: 'residential',
     customerPersona: '',
-    pricingTier: 'better',
     validUntil: '',
     voiceTranscript: '',
     items: []
@@ -265,18 +269,36 @@ export default function CreateProposalPage() {
 
   // API hooks
   const { get: fetchProposalPersonas } = useApi<{ personas: ProposalPersona[] }>({
-    onSuccess: (data) => setPersonas(data.personas),
-    onError: (error) => setError(`Failed to load personas: ${error.message}`)
+    onSuccess: (data) => {
+      console.log('✅ Personas loaded successfully:', data);
+      setPersonas(data.personas);
+    },
+    onError: (error) => {
+      console.error('❌ Failed to load personas:', error);
+      setError(`Failed to load personas: ${error.message}`);
+    }
   });
 
   const { get: fetchCustomers } = useApi<{ customers: Customer[] }>({
-    onSuccess: (data) => setCustomers(data.customers),
-    onError: (error) => setError(`Failed to load customers: ${error.message}`)
+    onSuccess: (data) => {
+      console.log('✅ Customers loaded successfully:', data);
+      setCustomers(data.customers);
+    },
+    onError: (error) => {
+      console.error('❌ Failed to load customers:', error);
+      setError(`Failed to load customers: ${error.message}`);
+    }
   });
 
   const { get: fetchProperties } = useApi<{ properties: Property[] }>({
-    onSuccess: (data) => setProperties(data.properties),
-    onError: (error) => setError(`Failed to load properties: ${error.message}`)
+    onSuccess: (data) => {
+      console.log('✅ Properties loaded successfully:', data);
+      setProperties(data.properties);
+    },
+    onError: (error) => {
+      console.error('❌ Failed to load properties:', error);
+      setError(`Failed to load properties: ${error.message}`);
+    }
   });
 
   const { get: searchProducts } = useApi<{ products: Product[] }>({
@@ -302,16 +324,40 @@ export default function CreateProposalPage() {
   // Initialize data on component mount
   useEffect(() => {
     const initializeData = async () => {
+      console.log('🚀 Starting data initialization...');
       setLoading(true);
+      setError(null);
+      
+      // Add timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.error('⏰ Data loading timeout after 10 seconds');
+        setError('Loading timeout - please refresh the page');
+        setLoading(false);
+      }, 10000);
+
       try {
-        await Promise.all([
+        console.log('📡 Making API calls...');
+        const results = await Promise.allSettled([
           fetchProposalPersonas(getApiUrl('/api/proposal-personas')),
           fetchCustomers(getApiUrl('/api/customers')),
           fetchProperties(getApiUrl('/api/properties'))
         ]);
+
+        // Check if any failed
+        const failures = results.filter(result => result.status === 'rejected');
+        if (failures.length > 0) {
+          console.warn('⚠️ Some API calls failed:', failures);
+          // Still allow the page to load with partial data
+        }
+
+        console.log('✅ Data initialization completed');
+        clearTimeout(timeout);
       } catch (error) {
-        console.error('Failed to initialize data:', error);
+        console.error('💥 Critical error during initialization:', error);
+        clearTimeout(timeout);
+        setError('Failed to initialize data. Please refresh the page.');
       } finally {
+        console.log('🏁 Setting loading to false');
         setLoading(false);
       }
     };
@@ -387,17 +433,12 @@ export default function CreateProposalPage() {
   useEffect(() => {
     console.log('🔍 Product search effect triggered:', { 
       productSearch: productSearch.trim(), 
-      pricingTier: formData.pricingTier,
       searchLength: productSearch.trim().length 
     });
     
     const timeoutId = setTimeout(() => {
       if (productSearch.trim()) {
-        const searchParams = new URLSearchParams({
-          search: productSearch,
-          pricingTier: formData.pricingTier
-        });
-        const searchUrl = getApiUrl(`/api/products?${searchParams.toString()}`);
+        const searchUrl = getApiUrl(`/api/products?search=${productSearch}`);
         console.log('🚀 Making product search API call:', searchUrl);
         searchProducts(searchUrl);
       } else {
@@ -407,7 +448,7 @@ export default function CreateProposalPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [productSearch, formData.pricingTier]);
+  }, [productSearch]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -442,8 +483,7 @@ export default function CreateProposalPage() {
     setSelectedPersona(persona || null);
     setFormData(prev => ({
       ...prev,
-      customerPersona: personaName,
-      pricingTier: (persona?.recommendedTier as any) || 'better'
+      customerPersona: personaName
     }));
   };
 
@@ -488,8 +528,18 @@ export default function CreateProposalPage() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.customerId || !formData.customerPersona) {
-      setError('Please fill in all required fields');
+    // Validate based on customer type
+    const isValidCustomer = formData.isExistingCustomer ? formData.customerId : (formData.prospectName && formData.prospectEmail);
+    
+    if (!formData.name || !isValidCustomer || !formData.customerPersona) {
+      const missingFields = [];
+      if (!formData.name) missingFields.push('Proposal Name');
+      if (!isValidCustomer) {
+        missingFields.push(formData.isExistingCustomer ? 'Customer Selection' : 'Prospect Name and Email');
+      }
+      if (!formData.customerPersona) missingFields.push('Customer Persona');
+      
+      setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -517,11 +567,29 @@ export default function CreateProposalPage() {
   if (loading) {
     return (
       <Container maxWidth="lg">
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" minHeight="60vh">
           <CircularProgress size={60} />
-          <Typography variant="h6" sx={{ ml: 2 }}>
+          <Typography variant="h6" sx={{ ml: 2, mt: 2 }}>
             Loading proposal data...
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            This should only take a few seconds
+          </Typography>
+          {error && (
+            <Alert severity="error" sx={{ mt: 3, maxWidth: 600 }}>
+              <Box>
+                <Typography variant="body2">{error}</Typography>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  sx={{ mt: 1 }}
+                  onClick={() => window.location.reload()}
+                >
+                  Retry
+                </Button>
+              </Box>
+            </Alert>
+          )}
         </Box>
       </Container>
     );
@@ -545,7 +613,7 @@ export default function CreateProposalPage() {
           Create Smart Proposal
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Create intelligent proposals with voice input, AI-powered product matching, and personalized pricing tiers.
+          Create intelligent proposals by selecting your project type, customer persona, and products. AI will suggest upsell opportunities and complementary products to maximize value.
         </Typography>
       </Box>
 
@@ -555,8 +623,88 @@ export default function CreateProposalPage() {
           <Paper sx={{ p: 3 }}>
             {/* Basic Information */}
             <Typography variant="h6" gutterBottom>
-              Proposal Information
+              Project Type & Basic Information
             </Typography>
+
+            {/* Project Type Selection - Prominent at top */}
+            <Box sx={{ mb: 4, p: 3, bgcolor: 'primary.50', borderRadius: 2, border: '2px solid', borderColor: 'primary.200' }}>
+              <Typography variant="h6" gutterBottom color="primary">
+                Select Project Type
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Choose the project type to see relevant customer personas and optimize your proposal
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Paper
+                    elevation={formData.projectType === 'residential' ? 8 : 1}
+                    sx={{
+                      p: 2,
+                      cursor: 'pointer',
+                      border: formData.projectType === 'residential' ? '2px solid' : '1px solid',
+                      borderColor: formData.projectType === 'residential' ? 'primary.main' : 'divider',
+                      bgcolor: formData.projectType === 'residential' ? 'primary.50' : 'background.paper',
+                      '&:hover': {
+                        bgcolor: 'primary.50',
+                        borderColor: 'primary.main'
+                      }
+                    }}
+                    onClick={() => {
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        projectType: 'residential',
+                        customerPersona: '' // Clear persona when changing type
+                      }));
+                      setSelectedPersona(null);
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
+                      <HomeIcon sx={{ mr: 1, color: 'primary.main' }} />
+                      <Typography variant="h6" color="primary">
+                        Residential
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Single-family homes, condos, apartments
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Paper
+                    elevation={formData.projectType === 'commercial' ? 8 : 1}
+                    sx={{
+                      p: 2,
+                      cursor: 'pointer',
+                      border: formData.projectType === 'commercial' ? '2px solid' : '1px solid',
+                      borderColor: formData.projectType === 'commercial' ? 'primary.main' : 'divider',
+                      bgcolor: formData.projectType === 'commercial' ? 'primary.50' : 'background.paper',
+                      '&:hover': {
+                        bgcolor: 'primary.50',
+                        borderColor: 'primary.main'
+                      }
+                    }}
+                    onClick={() => {
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        projectType: 'commercial',
+                        customerPersona: '' // Clear persona when changing type
+                      }));
+                      setSelectedPersona(null);
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
+                      <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
+                      <Typography variant="h6" color="primary">
+                        Commercial
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Offices, retail, hospitality, enterprise
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
             
             <Grid container spacing={3} sx={{ mb: 4 }}>
               <Grid item xs={12}>
@@ -570,27 +718,112 @@ export default function CreateProposalPage() {
                 />
               </Grid>
 
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Customer</InputLabel>
-                  <Select
-                    value={formData.customerId}
-                    label="Customer"
-                    onChange={(e) => setFormData(prev => ({ ...prev, customerId: e.target.value }))}
-                  >
-                    {customers.map((customer) => (
-                      <MenuItem key={customer.id} value={customer.id}>
-                        <Box display="flex" alignItems="center">
-                          <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: '0.75rem' }}>
-                            {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
-                          </Avatar>
-                          {customer.firstName} {customer.lastName}
-                          {customer.company && ` (${customer.company})`}
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+              {/* Customer Status Selection */}
+              <Grid item xs={12}>
+                <Box sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'grey.300' }}>
+                  <Typography variant="h6" gutterBottom>
+                    Customer Information
+                  </Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isExistingCustomer}
+                        onChange={(e) => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            isExistingCustomer: e.target.checked,
+                            // Clear fields when switching
+                            customerId: '',
+                            prospectName: '',
+                            prospectCompany: '',
+                            prospectEmail: '',
+                            prospectPhone: ''
+                          }));
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box display="flex" alignItems="center">
+                        <PersonIcon sx={{ mr: 1 }} />
+                        <Typography variant="body1">
+                          {formData.isExistingCustomer ? 'Existing Customer' : 'New Prospect'}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+                    {formData.isExistingCustomer 
+                      ? 'Select from your existing customer database'
+                      : 'Enter prospect information (will become customer after approval + payment)'
+                    }
+                  </Typography>
+
+                  {formData.isExistingCustomer ? (
+                    <FormControl fullWidth required>
+                      <InputLabel>Select Customer</InputLabel>
+                      <Select
+                        value={formData.customerId}
+                        label="Select Customer"
+                        onChange={(e) => setFormData(prev => ({ ...prev, customerId: e.target.value }))}
+                      >
+                        {customers.map((customer) => (
+                          <MenuItem key={customer.id} value={customer.id}>
+                            <Box display="flex" alignItems="center">
+                              <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: '0.75rem' }}>
+                                {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
+                              </Avatar>
+                              {customer.firstName} {customer.lastName}
+                              {customer.company && ` (${customer.company})`}
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Contact Name"
+                          value={formData.prospectName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, prospectName: e.target.value }))}
+                          required={!formData.isExistingCustomer}
+                          placeholder="John Doe"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Company/Organization"
+                          value={formData.prospectCompany}
+                          onChange={(e) => setFormData(prev => ({ ...prev, prospectCompany: e.target.value }))}
+                          placeholder="Acme Corp (optional)"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Email Address"
+                          type="email"
+                          value={formData.prospectEmail}
+                          onChange={(e) => setFormData(prev => ({ ...prev, prospectEmail: e.target.value }))}
+                          required={!formData.isExistingCustomer}
+                          placeholder="john@acmecorp.com"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Phone Number"
+                          value={formData.prospectPhone}
+                          onChange={(e) => setFormData(prev => ({ ...prev, prospectPhone: e.target.value }))}
+                          placeholder="(555) 123-4567"
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </Box>
               </Grid>
 
               <Grid item xs={12} md={6}>
@@ -619,7 +852,9 @@ export default function CreateProposalPage() {
                     label="Customer Persona"
                     onChange={(e) => handlePersonaChange(e.target.value)}
                   >
-                    {personas.map((persona) => (
+                    {personas
+                      .filter(persona => persona.type === formData.projectType)
+                      .map((persona) => (
                       <MenuItem key={persona.id} value={persona.name}>
                         <Box>
                           <Box display="flex" alignItems="center">
@@ -629,36 +864,6 @@ export default function CreateProposalPage() {
                           <Typography variant="caption" color="text.secondary">
                             {persona.description}
                           </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Pricing Tier</InputLabel>
-                  <Select
-                    value={formData.pricingTier}
-                    label="Pricing Tier"
-                    onChange={(e) => setFormData(prev => ({ ...prev, pricingTier: e.target.value as any }))}
-                  >
-                    {PRICING_TIERS.map((tier) => (
-                      <MenuItem key={tier.value} value={tier.value}>
-                        <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                          <Box>
-                            <Chip
-                              label={tier.label}
-                              color={tier.color as any}
-                              size="small"
-                              sx={{ mr: 1 }}
-                            />
-                            {tier.description}
-                          </Box>
-                          {selectedPersona?.recommendedTier === tier.value && (
-                            <StarIcon color="primary" fontSize="small" />
-                          )}
                         </Box>
                       </MenuItem>
                     ))}
@@ -757,7 +962,7 @@ export default function CreateProposalPage() {
             <Box sx={{ mb: 3 }}>
               <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Typography variant="h6">
-                  Product Selection
+                  Product Selection & AI Recommendations
                 </Typography>
                 <IconButton onClick={() => toggleSection('productSearch')}>
                   {expandedSections.productSearch ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -765,6 +970,12 @@ export default function CreateProposalPage() {
               </Box>
 
               <Collapse in={expandedSections.productSearch}>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    <strong>AI-Powered Suggestions:</strong> As you add products, our AI will identify complementary products and upsell opportunities to maximize project value.
+                  </Typography>
+                </Alert>
+                
                 <TextField
                   fullWidth
                   label="Search Products"
@@ -935,7 +1146,7 @@ export default function CreateProposalPage() {
           {/* Pricing Summary */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Pricing Summary
+              Proposal Summary
             </Typography>
             
             <Box sx={{ mb: 2 }}>
@@ -956,6 +1167,12 @@ export default function CreateProposalPage() {
               </Box>
             </Box>
 
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                Final pricing will be discussed and customized during your face-to-face customer meeting.
+              </Typography>
+            </Alert>
+
             <Box display="flex" gap={2}>
               <Button
                 fullWidth
@@ -963,7 +1180,7 @@ export default function CreateProposalPage() {
                 size="large"
                 startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
                 onClick={handleSubmit}
-                disabled={saving || !formData.name || !formData.customerId || !formData.customerPersona}
+                disabled={saving || !formData.name || !(formData.isExistingCustomer ? formData.customerId : (formData.prospectName && formData.prospectEmail)) || !formData.customerPersona}
               >
                 {saving ? 'Creating...' : 'Create Proposal'}
               </Button>
@@ -1047,11 +1264,11 @@ export default function CreateProposalPage() {
               </Box>
 
               <Box mt={2}>
-                <Chip
-                  label={`Recommended: ${selectedPersona?.recommendedTier?.toUpperCase() || 'BETTER'}`}
-                  color="primary"
-                  variant="filled"
-                />
+                <Alert severity="info" variant="outlined">
+                  <Typography variant="caption">
+                    AI will suggest complementary products based on this persona's preferences and project requirements.
+                  </Typography>
+                </Alert>
               </Box>
             </Paper>
           )}
@@ -1059,7 +1276,7 @@ export default function CreateProposalPage() {
           {/* Quick Actions */}
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Quick Actions
+              AI Assistant Tools
             </Typography>
             
             <Box display="flex" flexDirection="column" gap={1}>
@@ -1073,20 +1290,39 @@ export default function CreateProposalPage() {
                 {voiceState.isListening ? 'Stop Recording' : 'Voice Input'}
               </Button>
               
+              {formData.items.length > 0 && (
+                <Button
+                  variant="outlined"
+                  startIcon={<StarIcon />}
+                  color="success"
+                  disabled
+                >
+                  AI Upsell Suggestions (Coming Soon)
+                </Button>
+              )}
+              
               <Button
                 variant="outlined"
                 startIcon={<ClearIcon />}
-                onClick={() => setFormData({
-                  name: '',
-                  description: '',
-                  customerId: '',
-                  propertyId: '',
-                  customerPersona: '',
-                  pricingTier: 'better',
-                  validUntil: '',
-                  voiceTranscript: '',
-                  items: []
-                })}
+                onClick={() => {
+                  setFormData({
+                    name: '',
+                    description: '',
+                    isExistingCustomer: true,
+                    customerId: '',
+                    prospectName: '',
+                    prospectCompany: '',
+                    prospectEmail: '',
+                    prospectPhone: '',
+                    propertyId: '',
+                    projectType: 'residential',
+                    customerPersona: '',
+                    validUntil: '',
+                    voiceTranscript: '',
+                    items: []
+                  });
+                  setSelectedPersona(null);
+                }}
               >
                 Clear Form
               </Button>

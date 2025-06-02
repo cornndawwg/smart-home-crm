@@ -38,6 +38,7 @@ import {
   List as ListIcon,
   ExpandLess,
   ExpandMore,
+  PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -96,6 +97,12 @@ const navigationItems: NavigationItem[] = [
         href: '/proposals/create',
         icon: <AddIcon />,
         description: 'Create with voice input & AI'
+      },
+      {
+        label: 'Prospects',
+        href: '/prospects',
+        icon: <PersonAddIcon />,
+        description: 'Manage prospects & conversion pipeline'
       }
     ]
   },

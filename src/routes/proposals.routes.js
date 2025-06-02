@@ -13,98 +13,52 @@ const prisma = new PrismaClient();
 
 router.get('/', async (req, res) => {
   try {
-    const { summary, search, status, persona, tier, page = 1, limit = 20 } = req.query;
+    console.log('🔍 Starting proposals fetch with query:', req.query);
+    
+    const { page = 1, limit = 20, search, status, persona } = req.query;
+    const where = {};
 
-    // Handle dashboard summary request
-    if (summary === 'true') {
-      const [
-        totalProposals,
-        draftProposals,
-        sentProposals,
-        acceptedProposals,
-        rejectedProposals,
-        totalValue
-      ] = await Promise.all([
-        prisma.proposal.count(),
-        prisma.proposal.count({ where: { status: 'draft' } }),
-        prisma.proposal.count({ where: { status: 'sent' } }),
-        prisma.proposal.count({ where: { status: 'accepted' } }),
-        prisma.proposal.count({ where: { status: 'rejected' } }),
-        prisma.proposal.aggregate({
-          _sum: { totalAmount: true }
-        })
-      ]);
+    // Basic filters
+    if (status) where.status = status;
+    if (persona) where.customerPersona = persona;
 
-      return res.json({
-        totalProposals,
-        draftProposals,
-        sentProposals,
-        acceptedProposals,
-        rejectedProposals,
-        totalValue: totalValue._sum.totalAmount || 0
-      });
+    // Add filter for prospects vs customers
+    if (req.query.prospectOnly === 'true') {
+      console.log('📋 Filtering for prospects only');
+      where.isExistingCustomer = false;
+    } else if (req.query.customerOnly === 'true') {
+      console.log('👥 Filtering for customers only');
+      where.isExistingCustomer = true;
     }
 
-    // Handle regular proposal list request
-    const where = {};
-    
+    // Search functionality
     if (search) {
       where.OR = [
         { name: { contains: search } },
         { description: { contains: search } },
-        { customer: {
-          OR: [
-            { firstName: { contains: search } },
-            { lastName: { contains: search } },
-            { company: { contains: search } }
-          ]
-        }}
+        { prospectName: { contains: search } },
+        { prospectCompany: { contains: search } }
       ];
     }
-    
-    if (status) where.status = status;
-    if (persona) where.customerPersona = persona;
-    if (tier) where.pricingTier = tier;
+
+    console.log('🔍 Query WHERE clause:', JSON.stringify(where, null, 2));
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    const [proposals, total] = await Promise.all([
-      prisma.proposal.findMany({
-        where,
-        include: {
-          customer: {
-            select: {
-              firstName: true,
-              lastName: true,
-              company: true,
-              email: true
-            }
-          },
-          property: {
-            select: {
-              name: true,
-              type: true,
-              squareFootage: true
-            }
-          },
-          items: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  category: true,
-                  brand: true
-                }
-              }
-            }
-          }
-        },
-        skip,
-        take: parseInt(limit),
-        orderBy: { updatedAt: 'desc' }
-      }),
-      prisma.proposal.count({ where })
-    ]);
+    console.log('📊 Starting database query...');
+    
+    // Simplified query to avoid hanging
+    const proposals = await prisma.proposal.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { updatedAt: 'desc' }
+    });
+    
+    console.log(`✅ Found ${proposals.length} proposals`);
+    
+    const total = await prisma.proposal.count({ where });
+    console.log(`✅ Total count: ${total}`);
 
     res.json({
       proposals,
@@ -115,8 +69,10 @@ router.get('/', async (req, res) => {
         pages: Math.ceil(total / parseInt(limit))
       }
     });
+    
+    console.log('✅ Response sent successfully');
   } catch (error) {
-    console.error('Error fetching proposals:', error);
+    console.error('❌ Error fetching proposals:', error);
     res.status(500).json({ 
       error: 'Failed to fetch proposals',
       details: error.message 
@@ -195,6 +151,15 @@ router.post('/', async (req, res) => {
   try {
     const proposalData = req.body;
     
+    // Validate based on customer type
+    if (proposalData.isExistingCustomer && !proposalData.customerId) {
+      return res.status(400).json({ error: 'Customer ID is required for existing customers' });
+    }
+    
+    if (!proposalData.isExistingCustomer && (!proposalData.prospectName || !proposalData.prospectEmail)) {
+      return res.status(400).json({ error: 'Prospect name and email are required for new prospects' });
+    }
+    
     // Calculate total amount from items
     const subtotal = proposalData.items.reduce((sum, item) => 
       sum + (item.quantity * item.unitPrice), 0
@@ -206,10 +171,15 @@ router.post('/', async (req, res) => {
       data: {
         name: proposalData.name,
         description: proposalData.description,
-        customerId: proposalData.customerId,
+        isExistingCustomer: proposalData.isExistingCustomer,
+        customerId: proposalData.isExistingCustomer ? proposalData.customerId : null,
+        prospectName: !proposalData.isExistingCustomer ? proposalData.prospectName : null,
+        prospectCompany: !proposalData.isExistingCustomer ? proposalData.prospectCompany : null,
+        prospectEmail: !proposalData.isExistingCustomer ? proposalData.prospectEmail : null,
+        prospectPhone: !proposalData.isExistingCustomer ? proposalData.prospectPhone : null,
+        prospectStatus: !proposalData.isExistingCustomer ? 'prospect' : null,
         propertyId: proposalData.propertyId || null,
         customerPersona: proposalData.customerPersona,
-        pricingTier: proposalData.pricingTier,
         status: 'draft',
         totalAmount: totalAmount,
         validUntil: proposalData.validUntil ? new Date(proposalData.validUntil) : null,
@@ -229,14 +199,14 @@ router.post('/', async (req, res) => {
         }
       },
       include: {
-        customer: {
+        customer: proposalData.isExistingCustomer ? {
           select: {
             firstName: true,
             lastName: true,
             company: true,
             email: true
           }
-        },
+        } : false,
         property: {
           select: {
             name: true,

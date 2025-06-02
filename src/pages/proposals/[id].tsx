@@ -116,14 +116,24 @@ interface Proposal {
   description: string;
   status: 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected' | 'expired';
   customerPersona: string;
-  pricingTier: 'good' | 'better' | 'best';
   totalAmount: number;
   validUntil?: string;
   voiceTranscript?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
-  customer: Customer;
+  
+  // Customer vs Prospect fields
+  isExistingCustomer: boolean;
+  customer?: Customer | null;  // Optional for prospects
+  
+  // Prospect fields (used when isExistingCustomer = false)
+  prospectName?: string;
+  prospectCompany?: string;
+  prospectEmail?: string;
+  prospectPhone?: string;
+  prospectStatus?: string;
+  
   property?: Property;
   items: ProposalItem[];
 }
@@ -135,12 +145,6 @@ const STATUS_COLORS = {
   accepted: 'success',
   rejected: 'error',
   expired: 'warning'
-} as const;
-
-const PRICING_TIERS = {
-  good: { label: 'Good', color: 'success', description: 'Essential features at competitive price' },
-  better: { label: 'Better', color: 'primary', description: 'Enhanced features with professional service' },
-  best: { label: 'Best', color: 'error', description: 'Premium features with white-glove service' }
 } as const;
 
 export default function ProposalDetailPage() {
@@ -276,12 +280,6 @@ export default function ProposalDetailPage() {
               <Chip
                 label={proposal.status.toUpperCase()}
                 color={STATUS_COLORS[proposal.status] as any}
-                size="medium"
-              />
-              <Chip
-                label={PRICING_TIERS[proposal.pricingTier].label}
-                color={PRICING_TIERS[proposal.pricingTier].color as any}
-                variant="outlined"
                 size="medium"
               />
               <Typography variant="body2" color="text.secondary">
@@ -470,48 +468,96 @@ export default function ProposalDetailPage() {
 
         {/* Sidebar */}
         <Grid item xs={12} lg={4}>
-          {/* Customer Information */}
+          {/* Customer/Prospect Information */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
               <PersonIcon sx={{ mr: 1 }} />
-              <Typography variant="h6">Customer Information</Typography>
+              <Typography variant="h6">
+                {proposal.isExistingCustomer ? 'Customer Information' : 'Prospect Information'}
+              </Typography>
             </Box>
             
-            <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
-              <Avatar sx={{ mr: 2 }}>
-                {proposal.customer.firstName.charAt(0)}{proposal.customer.lastName.charAt(0)}
-              </Avatar>
-              <Box>
-                <Typography variant="body1" fontWeight="medium">
-                  {proposal.customer.firstName} {proposal.customer.lastName}
-                </Typography>
-                {proposal.customer.company && (
-                  <Typography variant="body2" color="text.secondary">
-                    {proposal.customer.company}
-                  </Typography>
+            {proposal.isExistingCustomer && proposal.customer ? (
+              // Customer Information
+              <>
+                <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
+                  <Avatar sx={{ mr: 2 }}>
+                    {proposal.customer.firstName?.charAt(0) || 'C'}{proposal.customer.lastName?.charAt(0) || 'U'}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body1" fontWeight="medium">
+                      {proposal.customer.firstName} {proposal.customer.lastName}
+                    </Typography>
+                    {proposal.customer.company && (
+                      <Typography variant="body2" color="text.secondary">
+                        {proposal.customer.company}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+
+                <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
+                  <EmailIcon sx={{ mr: 1, fontSize: 16 }} />
+                  <Typography variant="body2">{proposal.customer.email}</Typography>
+                </Box>
+
+                {proposal.customer.phone && (
+                  <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
+                    <PhoneIcon sx={{ mr: 1, fontSize: 16 }} />
+                    <Typography variant="body2">{proposal.customer.phone}</Typography>
+                  </Box>
                 )}
-              </Box>
-            </Box>
 
-            <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
-              <EmailIcon sx={{ mr: 1, fontSize: 16 }} />
-              <Typography variant="body2">{proposal.customer.email}</Typography>
-            </Box>
+                <Chip
+                  label={proposal.customer.type?.toUpperCase() || 'CUSTOMER'}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  sx={{ mt: 1 }}
+                />
+              </>
+            ) : (
+              // Prospect Information
+              <>
+                <Box display="flex" alignItems="center" sx={{ mb: 2 }}>
+                  <Avatar sx={{ mr: 2 }}>
+                    {proposal.prospectName?.charAt(0) || 'P'}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body1" fontWeight="medium">
+                      {proposal.prospectName || 'Unknown Prospect'}
+                    </Typography>
+                    {proposal.prospectCompany && (
+                      <Typography variant="body2" color="text.secondary">
+                        {proposal.prospectCompany}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
 
-            {proposal.customer.phone && (
-              <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
-                <PhoneIcon sx={{ mr: 1, fontSize: 16 }} />
-                <Typography variant="body2">{proposal.customer.phone}</Typography>
-              </Box>
+                {proposal.prospectEmail && (
+                  <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
+                    <EmailIcon sx={{ mr: 1, fontSize: 16 }} />
+                    <Typography variant="body2">{proposal.prospectEmail}</Typography>
+                  </Box>
+                )}
+
+                {proposal.prospectPhone && (
+                  <Box display="flex" alignItems="center" sx={{ mb: 1 }}>
+                    <PhoneIcon sx={{ mr: 1, fontSize: 16 }} />
+                    <Typography variant="body2">{proposal.prospectPhone}</Typography>
+                  </Box>
+                )}
+
+                <Chip
+                  label={proposal.prospectStatus?.toUpperCase() || 'PROSPECT'}
+                  size="small"
+                  color="secondary"
+                  variant="outlined"
+                  sx={{ mt: 1 }}
+                />
+              </>
             )}
-
-            <Chip
-              label={proposal.customer.type.toUpperCase()}
-              size="small"
-              color="primary"
-              variant="outlined"
-              sx={{ mt: 1 }}
-            />
           </Paper>
 
           {/* Property Information */}
@@ -542,25 +588,13 @@ export default function ProposalDetailPage() {
           {/* Persona & Pricing */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Customer Persona & Pricing
+              Customer Persona
             </Typography>
             
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" color="text.secondary">Customer Persona:</Typography>
               <Typography variant="body1" fontWeight="medium">
                 {proposal.customerPersona}
-              </Typography>
-            </Box>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">Pricing Tier:</Typography>
-              <Chip
-                label={PRICING_TIERS[proposal.pricingTier].label}
-                color={PRICING_TIERS[proposal.pricingTier].color as any}
-                sx={{ mt: 0.5 }}
-              />
-              <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                {PRICING_TIERS[proposal.pricingTier].description}
               </Typography>
             </Box>
           </Paper>
