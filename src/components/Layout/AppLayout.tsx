@@ -18,6 +18,7 @@ import {
   Chip,
   useTheme,
   alpha,
+  Collapse,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -32,6 +33,11 @@ import {
   AccountCircle,
   Logout as LogoutIcon,
   Group as GroupIcon,
+  Description as ProposalIcon,
+  Add as AddIcon,
+  List as ListIcon,
+  ExpandLess,
+  ExpandMore,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -44,6 +50,7 @@ interface NavigationItem {
   icon: React.ReactNode;
   badge?: number;
   description?: string;
+  subItems?: NavigationItem[];
 }
 
 const navigationItems: NavigationItem[] = [
@@ -71,6 +78,26 @@ const navigationItems: NavigationItem[] = [
     href: '/customers',
     icon: <PeopleIcon />,
     description: 'Customer management'
+  },
+  {
+    label: 'Smart Proposals',
+    href: '/proposals',
+    icon: <ProposalIcon />,
+    description: 'AI-powered proposal system',
+    subItems: [
+      {
+        label: 'View All Proposals',
+        href: '/proposals',
+        icon: <ListIcon />,
+        description: 'Browse all proposals'
+      },
+      {
+        label: 'Create New Proposal',
+        href: '/proposals/create',
+        icon: <AddIcon />,
+        description: 'Create with voice input & AI'
+      }
+    ]
   },
   {
     label: 'Employees',
@@ -109,6 +136,9 @@ export default function AppLayout({ children, title = 'Smart Home CRM' }: AppLay
   const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
+    '/proposals': true // Default expand Proposals section
+  });
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -122,11 +152,104 @@ export default function AppLayout({ children, title = 'Smart Home CRM' }: AppLay
     setUserMenuAnchor(null);
   };
 
+  const handleExpandToggle = (href: string) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [href]: !prev[href]
+    }));
+  };
+
   const isActivePath = (href: string) => {
     if (href === '/') {
       return router.pathname === '/';
     }
     return router.pathname.startsWith(href);
+  };
+
+  const isSubItemActive = (item: NavigationItem) => {
+    if (!item.subItems) return false;
+    return item.subItems.some(subItem => isActivePath(subItem.href));
+  };
+
+  const renderNavigationItem = (item: NavigationItem, isSubItem = false) => {
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const isExpanded = expandedItems[item.href];
+    const isActive = isActivePath(item.href);
+    const hasActiveSubItem = isSubItemActive(item);
+
+    return (
+      <React.Fragment key={item.href}>
+        <ListItem disablePadding sx={{ mb: 0.5 }}>
+          <ListItemButton
+            component={hasSubItems ? 'div' : Link}
+            href={hasSubItems ? undefined : item.href}
+            onClick={hasSubItems ? () => handleExpandToggle(item.href) : undefined}
+            selected={isActive || hasActiveSubItem}
+            sx={{
+              mx: isSubItem ? 1 : 2,
+              ml: isSubItem ? 4 : 2,
+              borderRadius: 2,
+              '&.Mui-selected': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                },
+              },
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.action.hover, 0.8),
+              },
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                color: 'inherit',
+                minWidth: 40,
+              }}
+            >
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText
+              primary={item.label}
+              secondary={!isSubItem ? item.description : undefined}
+              primaryTypographyProps={{
+                fontSize: isSubItem ? '0.875rem' : '0.95rem',
+                fontWeight: (isActive || hasActiveSubItem) ? 600 : 400,
+              }}
+              secondaryTypographyProps={{
+                fontSize: '0.75rem',
+                color: 'text.secondary',
+              }}
+            />
+            {item.badge && (
+              <Chip
+                label={item.badge}
+                size="small"
+                color="primary"
+                sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
+              />
+            )}
+            {hasSubItems && (
+              <IconButton
+                size="small"
+                sx={{ color: 'inherit', ml: 1 }}
+              >
+                {isExpanded ? <ExpandLess /> : <ExpandMore />}
+              </IconButton>
+            )}
+          </ListItemButton>
+        </ListItem>
+
+        {/* Sub Items */}
+        {hasSubItems && (
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {item.subItems?.map((subItem) => renderNavigationItem(subItem, true))}
+            </List>
+          </Collapse>
+        )}
+      </React.Fragment>
+    );
   };
 
   const drawer = (
@@ -143,58 +266,7 @@ export default function AppLayout({ children, title = 'Smart Home CRM' }: AppLay
 
       {/* Navigation */}
       <List sx={{ flex: 1, py: 2 }}>
-        {navigationItems.map((item) => (
-          <ListItem key={item.href} disablePadding sx={{ mb: 0.5 }}>
-            <ListItemButton
-              component={Link}
-              href={item.href}
-              selected={isActivePath(item.href)}
-              sx={{
-                mx: 2,
-                borderRadius: 2,
-                '&.Mui-selected': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main,
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.action.hover, 0.8),
-                },
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  color: 'inherit',
-                  minWidth: 40,
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                secondary={item.description}
-                primaryTypographyProps={{
-                  fontSize: '0.95rem',
-                  fontWeight: isActivePath(item.href) ? 600 : 400,
-                }}
-                secondaryTypographyProps={{
-                  fontSize: '0.75rem',
-                  color: 'text.secondary',
-                }}
-              />
-              {item.badge && (
-                <Chip
-                  label={item.badge}
-                  size="small"
-                  color="primary"
-                  sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
-                />
-              )}
-            </ListItemButton>
-          </ListItem>
-        ))}
+        {navigationItems.map((item) => renderNavigationItem(item))}
       </List>
 
       {/* Bottom Section */}

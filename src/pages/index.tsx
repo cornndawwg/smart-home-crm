@@ -23,6 +23,7 @@ import {
   TrendingUp as TrendingUpIcon,
   Settings as SettingsIcon,
   Refresh as RefreshIcon,
+  Description as ProposalIcon,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import { getApiUrl } from '../lib/api';
@@ -101,6 +102,13 @@ export default function HomePage() {
       icon: <PeopleIcon />,
       color: 'primary',
       action: () => router.push('/customers'),
+    },
+    {
+      title: 'Smart Proposals',
+      description: 'AI-powered proposal creation',
+      icon: <ProposalIcon />,
+      color: 'error',
+      action: () => router.push('/proposals'),
     },
     {
       title: 'Properties',

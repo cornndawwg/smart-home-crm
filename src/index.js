@@ -20,6 +20,10 @@ const { errorHandler } = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth.routes');
 const customerRoutes = require('./routes/customers.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const proposalRoutes = require('./routes/proposals.routes');
+const productRoutes = require('./routes/products.routes');
+const proposalPersonaRoutes = require('./routes/proposal-personas.routes');
+const propertyRoutes = require('./routes/properties.routes');
 
 const app = express();
 
@@ -43,7 +47,7 @@ const corsOptions = {
     'http://127.0.0.1:3002'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
@@ -65,7 +69,11 @@ app.get('/', (req, res) => {
     endpoints: {
       auth: '/api/auth',
       customers: '/api/customers',
-      upload: '/api/upload'
+      upload: '/api/upload',
+      proposals: '/api/proposals',
+      products: '/api/products',
+      proposalPersonas: '/api/proposal-personas',
+      properties: '/api/properties'
     }
   });
 });
@@ -73,6 +81,10 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/proposals', proposalRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/proposal-personas', proposalPersonaRoutes);
+app.use('/api/properties', propertyRoutes);
 
 // Error handling
 app.use(errorHandler);

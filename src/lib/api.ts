@@ -6,6 +6,10 @@ export const apiConfig = {
     customers: '/api/customers',
     auth: '/api/auth',
     upload: '/api/upload',
+    proposals: '/api/proposals',
+    products: '/api/products',
+    proposalPersonas: '/api/proposal-personas',
+    properties: '/api/properties',
   },
 };
 
