@@ -75,14 +75,37 @@ export default function ProposalsPage() {
 
   const { get: fetchProposals } = useApi<{ proposals: Proposal[] }>({
     onSuccess: (data) => {
-      setProposals(data.proposals || []);
+      console.log('✅ API Response received:', data);
+      const proposalsData = data?.proposals || [];
+      console.log('📊 Setting proposals data:', proposalsData);
+      setProposals(proposalsData);
       setLoading(false);
     },
     onError: (error) => {
+      console.error('❌ API Error:', error);
       setError(`Failed to load proposals: ${error.message}`);
+      setProposals([]); // Ensure proposals is always an array
       setLoading(false);
     }
   });
+
+  // Safe proposals array with fallback
+  const safeProposals = proposals || [];
+
+  // Safe calculation functions
+  const getTotalProposals = () => safeProposals.length;
+  
+  const getTotalValue = () => {
+    return safeProposals.reduce((sum, p) => sum + (p?.totalAmount || 0), 0);
+  };
+  
+  const getAcceptedCount = () => {
+    return safeProposals.filter(p => p?.status === 'accepted').length;
+  };
+  
+  const getPendingCount = () => {
+    return safeProposals.filter(p => p?.status && ['sent', 'viewed'].includes(p.status)).length;
+  };
 
   useEffect(() => {
     fetchProposals(getApiUrl('/api/proposals'));
@@ -182,7 +205,7 @@ export default function ProposalsPage() {
                 Total Proposals
               </Typography>
               <Typography variant="h4">
-                {proposals.length}
+                {getTotalProposals()}
               </Typography>
             </CardContent>
           </Card>
@@ -194,7 +217,7 @@ export default function ProposalsPage() {
                 Total Value
               </Typography>
               <Typography variant="h4">
-                {formatCurrency(proposals.reduce((sum, p) => sum + p.totalAmount, 0))}
+                {formatCurrency(getTotalValue())}
               </Typography>
             </CardContent>
           </Card>
@@ -206,7 +229,7 @@ export default function ProposalsPage() {
                 Accepted
               </Typography>
               <Typography variant="h4">
-                {proposals.filter(p => p.status === 'accepted').length}
+                {getAcceptedCount()}
               </Typography>
             </CardContent>
           </Card>
@@ -218,7 +241,7 @@ export default function ProposalsPage() {
                 Pending
               </Typography>
               <Typography variant="h4">
-                {proposals.filter(p => ['sent', 'viewed'].includes(p.status)).length}
+                {getPendingCount()}
               </Typography>
             </CardContent>
           </Card>
@@ -227,7 +250,7 @@ export default function ProposalsPage() {
 
       {/* Proposals Table */}
       <Paper>
-        {proposals.length === 0 ? (
+        {safeProposals.length === 0 ? (
           <Box p={6} textAlign="center">
             <AssessmentIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -262,7 +285,7 @@ export default function ProposalsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {proposals.map((proposal) => (
+                {safeProposals.map((proposal) => (
                   <TableRow 
                     key={proposal.id} 
                     hover 
@@ -272,57 +295,61 @@ export default function ProposalsPage() {
                         backgroundColor: 'action.hover'
                       }
                     }}
-                    onClick={() => router.push(`/proposals/${proposal.id}`)}
+                    onClick={() => {
+                      if (proposal?.id) {
+                        router.push(`/proposals/${proposal.id}`);
+                      }
+                    }}
                   >
                     <TableCell>
                       <Box>
                         <Typography variant="body2" fontWeight="medium">
-                          {proposal.name}
+                          {proposal?.name || 'Untitled Proposal'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {proposal.items.length} items
+                          {(proposal?.items?.length || 0)} items
                         </Typography>
                       </Box>
                     </TableCell>
                     <TableCell>
                       <Box>
                         <Typography variant="body2">
-                          {proposal.customer ? 
-                            `${proposal.customer.firstName} ${proposal.customer.lastName}` : 
-                            (proposal.prospectName || 'Unknown Prospect')
+                          {proposal?.customer ? 
+                            `${proposal.customer.firstName || ''} ${proposal.customer.lastName || ''}`.trim() : 
+                            (proposal?.prospectName || 'Unknown Prospect')
                           }
                         </Typography>
-                        {(proposal.customer?.company || proposal.prospectCompany) && (
+                        {(proposal?.customer?.company || proposal?.prospectCompany) && (
                           <Typography variant="caption" color="text.secondary">
-                            {proposal.customer?.company || proposal.prospectCompany}
+                            {proposal?.customer?.company || proposal?.prospectCompany}
                           </Typography>
                         )}
                       </Box>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {proposal.customerPersona}
+                        {proposal?.customerPersona || 'Not specified'}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={proposal.status.toUpperCase()}
-                        color={getStatusColor(proposal.status) as any}
+                        label={(proposal?.status || 'unknown').toUpperCase()}
+                        color={getStatusColor(proposal?.status || 'default') as any}
                         size="small"
                       />
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" fontWeight="medium">
-                        {formatCurrency(proposal.totalAmount)}
+                        {formatCurrency(proposal?.totalAmount || 0)}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {formatDate(proposal.createdAt)}
+                        {proposal?.createdAt ? formatDate(proposal.createdAt) : 'Unknown'}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {proposal.validUntil ? (
+                      {proposal?.validUntil ? (
                         <Typography variant="body2">
                           {formatDate(proposal.validUntil)}
                         </Typography>
@@ -337,7 +364,9 @@ export default function ProposalsPage() {
                         size="small"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleMenuOpen(e, proposal);
+                          if (proposal?.id) {
+                            handleMenuOpen(e, proposal);
+                          }
                         }}
                       >
                         <MoreVertIcon />
@@ -358,7 +387,7 @@ export default function ProposalsPage() {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={() => {
-          if (selectedProposal) {
+          if (selectedProposal?.id) {
             router.push(`/proposals/${selectedProposal.id}`);
           }
           handleMenuClose();
@@ -367,8 +396,8 @@ export default function ProposalsPage() {
           View Details
         </MenuItem>
         <MenuItem onClick={() => {
-          if (selectedProposal) {
-            router.push(`/proposals/${selectedProposal.id}/edit`);
+          if (selectedProposal?.id) {
+            router.push(`/proposals/edit/${selectedProposal.id}`);
           }
           handleMenuClose();
         }}>

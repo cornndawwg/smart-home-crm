@@ -24,6 +24,7 @@ const proposalRoutes = require('./routes/proposals.routes');
 const productRoutes = require('./routes/products.routes');
 const proposalPersonaRoutes = require('./routes/proposal-personas.routes');
 const propertyRoutes = require('./routes/properties.routes');
+const testDbRoutes = require('./routes/test-db.routes');
 
 const app = express();
 
@@ -73,7 +74,8 @@ app.get('/', (req, res) => {
       proposals: '/api/proposals',
       products: '/api/products',
       proposalPersonas: '/api/proposal-personas',
-      properties: '/api/properties'
+      properties: '/api/properties',
+      testDb: '/api/test-db'
     }
   });
 });
@@ -85,6 +87,7 @@ app.use('/api/proposals', proposalRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/proposal-personas', proposalPersonaRoutes);
 app.use('/api/properties', propertyRoutes);
+app.use('/api/test-db', testDbRoutes);
 
 // Error handling
 app.use(errorHandler);

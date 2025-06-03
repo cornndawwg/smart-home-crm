@@ -158,6 +158,8 @@ export default function ProposalDetailPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // API hooks
   const { get: fetchProposal } = useApi<Proposal>({
@@ -232,6 +234,95 @@ export default function ProposalDetailPage() {
     console.log('Update status to:', newStatus);
   };
 
+  const handleShare = () => {
+    setShareDialogOpen(true);
+  };
+
+  const handleCopyLink = async () => {
+    if (!proposal) return;
+    
+    try {
+      const proposalUrl = `${window.location.origin}/proposals/${proposal.id}`;
+      await navigator.clipboard.writeText(proposalUrl);
+      setSuccess('Proposal link copied to clipboard!');
+      setShareDialogOpen(false);
+    } catch (error) {
+      setError('Failed to copy link to clipboard');
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!proposal) return;
+    
+    setExporting(true);
+    try {
+      // Basic PDF export functionality
+      // In a real implementation, you'd use a library like jsPDF or call a backend service
+      const pdfContent = generatePDFContent(proposal, totals);
+      
+      // Create a blob and download link
+      const blob = new Blob([pdfContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `proposal-${proposal.name.replace(/\s+/g, '-').toLowerCase()}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setSuccess('Proposal exported successfully!');
+    } catch (error) {
+      setError('Failed to export proposal');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const generatePDFContent = (proposal: Proposal, totals: any): string => {
+    const customerInfo = proposal.isExistingCustomer && proposal.customer
+      ? `${proposal.customer.firstName} ${proposal.customer.lastName}${proposal.customer.company ? ` (${proposal.customer.company})` : ''}`
+      : `${proposal.prospectName || 'Unknown Prospect'}${proposal.prospectCompany ? ` (${proposal.prospectCompany})` : ''}`;
+
+    return `
+SMART HOME PROPOSAL
+==================
+
+Proposal: ${proposal.name}
+Customer: ${customerInfo}
+Date: ${new Date(proposal.createdAt).toLocaleDateString()}
+Status: ${proposal.status.toUpperCase()}
+
+Description:
+${proposal.description || 'No description provided.'}
+
+${proposal.voiceTranscript ? `Voice Notes: "${proposal.voiceTranscript}"` : ''}
+
+PROPOSAL ITEMS
+==============
+${proposal.items.map((item, index) => `
+${index + 1}. ${item.name}
+   Category: ${item.category}
+   Quantity: ${item.quantity}
+   Unit Price: $${item.unitPrice.toFixed(2)}
+   Total: $${item.totalPrice.toFixed(2)}
+   ${item.description ? `Description: ${item.description}` : ''}
+`).join('')}
+
+PRICING SUMMARY
+===============
+Subtotal: $${totals.subtotal.toFixed(2)}
+Tax (8%): $${totals.tax.toFixed(2)}
+TOTAL: $${totals.total.toFixed(2)}
+
+${proposal.validUntil ? `Valid Until: ${new Date(proposal.validUntil).toLocaleDateString()}` : ''}
+
+---
+Generated on ${new Date().toLocaleString()}
+Smart Home CRM System
+    `;
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg">
@@ -298,7 +389,7 @@ export default function ProposalDetailPage() {
             </Button>
             <Button
               startIcon={<EditIcon />}
-              onClick={() => router.push(`/proposals/${proposal.id}/edit`)}
+              onClick={() => router.push(`/proposals/edit/${proposal.id}`)}
               variant="outlined"
               color="primary"
             >
@@ -306,17 +397,20 @@ export default function ProposalDetailPage() {
             </Button>
             <Button
               startIcon={<ShareIcon />}
+              onClick={handleShare}
               variant="outlined"
               color="primary"
             >
               Share
             </Button>
             <Button
-              startIcon={<DownloadIcon />}
+              startIcon={exporting ? <CircularProgress size={16} /> : <DownloadIcon />}
+              onClick={handleExportPDF}
               variant="outlined"
               color="primary"
+              disabled={exporting}
             >
-              Export PDF
+              {exporting ? 'Exporting...' : 'Export PDF'}
             </Button>
             <IconButton
               color="error"
@@ -662,6 +756,45 @@ export default function ProposalDetailPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Share Dialog */}
+      <Dialog
+        open={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Share Proposal</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Share this proposal with others by copying the link below:
+          </Typography>
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: 'grey.100',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'grey.300',
+              wordBreak: 'break-all',
+              fontSize: '0.875rem',
+              fontFamily: 'monospace'
+            }}
+          >
+            {typeof window !== 'undefined' ? `${window.location.origin}/proposals/${proposal?.id}` : ''}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShareDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleCopyLink}
+            variant="contained"
+            color="primary"
+          >
+            Copy Link
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

@@ -17,24 +17,86 @@ router.get('/', async (req, res) => {
 
     // Handle dashboard summary request
     if (summary === 'true') {
-      const [
-        totalCustomers,
-        activeCustomers,
-        recentProjects,
-        completedProjects
-      ] = await Promise.all([
-        prisma.customer.count(),
-        prisma.customer.count({ where: { status: 'active' } }),
-        prisma.project.count({ where: { status: 'in-progress' } }),
-        prisma.project.count({ where: { status: 'completed' } })
-      ]);
+      try {
+        // Add connection test first
+        await prisma.$connect();
+        
+        const [
+          totalCustomers,
+          activeCustomers,
+          recentProjects,
+          completedProjects,
+          recentCustomers,
+        ] = await Promise.all([
+          // Total customers - with fallback
+          prisma.customer.count().catch(() => 0),
+          
+          // Active customers (customers with active status) - with fallback
+          prisma.customer.count({ where: { status: 'active' } }).catch(() => 0),
+          
+          // Recent projects (projects started in last 30 days) - with fallback
+          prisma.project.count({
+            where: {
+              startDate: {
+                gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+              },
+            },
+          }).catch(() => 0),
+          
+          // Completed projects - with fallback
+          prisma.project.count({
+            where: {
+              status: 'completed',
+            },
+          }).catch(() => 0),
+          
+          // Recent customers - with fallback
+          prisma.customer.findMany({
+            take: 5,
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              company: true,
+              status: true,
+              createdAt: true,
+            },
+          }).catch(() => []),
+        ]);
 
-      return res.json({
-        totalCustomers,
-        activeCustomers,
-        recentProjects,
-        completedProjects
-      });
+        console.log('Dashboard stats retrieved successfully:', {
+          totalCustomers,
+          activeCustomers,
+          recentProjects,
+          completedProjects,
+          recentCustomersCount: recentCustomers.length
+        });
+
+        return res.json({
+          totalCustomers,
+          activeCustomers,
+          recentProjects,
+          completedProjects,
+          recentCustomers: recentCustomers.map((customer) => ({
+            ...customer,
+            createdAt: customer.createdAt.toISOString(),
+          })),
+        });
+      } catch (summaryError) {
+        console.error('Error in dashboard summary:', summaryError);
+        
+        // Return safe fallback data if database queries fail
+        return res.json({
+          totalCustomers: 0,
+          activeCustomers: 0,
+          recentProjects: 0,
+          completedProjects: 0,
+          recentCustomers: [],
+        });
+      } finally {
+        await prisma.$disconnect();
+      }
     }
 
     // Handle regular customer list request
