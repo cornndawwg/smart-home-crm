@@ -6,12 +6,13 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Railway PostgreSQL - uses Railway's internal connection format
+  directUrl = env("DATABASE_URL")
 }
 
 model Customer {
@@ -21,7 +22,7 @@ model Customer {
   firstName           String
   lastName            String
   company             String?
-  email               String
+  email               String        @unique // Make email unique for better queries
   phone               String
   preferredCommunication String
   billingAddress      Address?
@@ -32,8 +33,21 @@ model Customer {
   notes               String?
   metrics             CustomerMetrics?
   proposals           Proposal[]
+  voiceRecordings     VoiceRecording[] // AI system integration
+  
+  // Analytics Relations
+  analyticsEvents     AnalyticsEvent[]
+  interactionTracking CustomerInteractionTracking[]
+  
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
+
+  // Performance indexes
+  @@index([email])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([lastName, firstName])
 }
 
 model Tag {
@@ -41,6 +55,9 @@ model Tag {
   name      String
   customer  Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId String
+
+  @@index([customerId])
+  @@index([name])
 }
 
 model Address {
@@ -53,6 +70,9 @@ model Address {
   customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId String  @unique
   property  Property?
+
+  @@index([city, state])
+  @@index([zipCode])
 }
 
 model Property {
@@ -73,6 +93,11 @@ model Property {
   customerId    String
   projects      Project[]
   proposals     Proposal[]
+  voiceRecordings VoiceRecording[] // AI system integration
+
+  @@index([customerId])
+  @@index([type])
+  @@index([squareFootage])
 }
 
 model Photo {
@@ -82,6 +107,9 @@ model Photo {
   propertyId  String
   uploadedAt  DateTime  @default(now())
   uploadedBy  String
+
+  @@index([propertyId])
+  @@index([uploadedAt])
 }
 
 model Document {
@@ -95,6 +123,11 @@ model Document {
   projectId   String?
   uploadedAt  DateTime  @default(now())
   uploadedBy  String
+
+  @@index([propertyId])
+  @@index([projectId])
+  @@index([type])
+  @@index([uploadedAt])
 }
 
 model SystemInstallation {
@@ -105,6 +138,10 @@ model SystemInstallation {
   lastService DateTime?
   property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   propertyId  String
+
+  @@index([propertyId])
+  @@index([type])
+  @@index([installDate])
 }
 
 model ServiceRecord {
@@ -116,6 +153,10 @@ model ServiceRecord {
   cost        Float
   property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   propertyId  String
+
+  @@index([propertyId])
+  @@index([date])
+  @@index([technician])
 }
 
 model Project {
@@ -134,6 +175,12 @@ model Project {
   customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId  String
   proposals   Proposal[]
+
+  @@index([customerId])
+  @@index([propertyId])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
 }
 
 model ProjectTeamMember {
@@ -142,6 +189,9 @@ model ProjectTeamMember {
   projectId   String
   teamMember  TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
   teamMemberId String
+
+  @@index([projectId])
+  @@index([teamMemberId])
 }
 
 model TeamMember {
@@ -151,6 +201,9 @@ model TeamMember {
   email     String
   phone     String
   projects  ProjectTeamMember[]
+
+  @@index([email])
+  @@index([role])
 }
 
 model Milestone {
@@ -163,6 +216,10 @@ model Milestone {
   assignedTo    String?
   project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId     String
+
+  @@index([projectId])
+  @@index([status])
+  @@index([dueDate])
 }
 
 model Budget {
@@ -174,6 +231,8 @@ model Budget {
   lineItems   BudgetLineItem[]
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String    @unique
+
+  @@index([projectId])
 }
 
 model BudgetLineItem {
@@ -183,6 +242,9 @@ model BudgetLineItem {
   category    String
   budget      Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   budgetId    String
+
+  @@index([budgetId])
+  @@index([category])
 }
 
 model Interaction {
@@ -198,6 +260,11 @@ model Interaction {
   updatedAt   DateTime  @updatedAt
   customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId  String
+
+  @@index([customerId])
+  @@index([type])
+  @@index([date])
+  @@index([createdBy])
 }
 
 model CustomerMetrics {
@@ -209,6 +276,8 @@ model CustomerMetrics {
   nextScheduledInteraction DateTime?
   customer               Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId             String     @unique
+
+  @@index([customerId])
 }
 
 // Smart Proposal System Models
@@ -244,6 +313,17 @@ model Proposal {
   createdBy       String
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  
+  // Analytics Relations
+  analyticsEvents AnalyticsEvent[]
+  proposalMetrics ProposalMetrics[]
+  aiProposals     AIProposal[]  @relation("FinalProposal")
+
+  @@index([customerId])
+  @@index([status])
+  @@index([customerPersona])
+  @@index([createdAt])
+  @@index([createdBy])
 }
 
 model ProposalItem {
@@ -261,6 +341,10 @@ model ProposalItem {
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([proposalId])
+  @@index([category])
+  @@index([productId])
 }
 
 model Product {
@@ -282,6 +366,11 @@ model Product {
   proposalItems   ProposalItem[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  @@index([category])
+  @@index([brand])
+  @@index([isActive])
+  @@index([sku])
 }
 
 model ProposalPersona {
@@ -295,4 +384,456 @@ model ProposalPersona {
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([type])
+  @@index([name])
+  @@index([isActive])
+}
+
+// Email System Models - For automated communications
+
+model EmailConfig {
+  id                    String    @id @default(uuid())
+  smtpHost             String
+  smtpPort             Int
+  smtpSecure           Boolean   @default(true)
+  smtpUser             String
+  smtpPassword         String    // Encrypted
+  fromEmail            String
+  fromName             String
+  
+  // Email Settings
+  maxRetries           Int       @default(3)
+  retryDelay           Int       @default(30000) // milliseconds
+  rateLimitPerHour     Int       @default(100)
+  
+  // Email Quotas
+  dailyQuotaLimit      Int       @default(1000)
+  dailyQuotaUsed       Int       @default(0)
+  quotaResetDate       DateTime  @default(now())
+  
+  isActive             Boolean   @default(true)
+  isDefault            Boolean   @default(false)
+  
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  emailTemplates       EmailTemplate[]
+  emailLogs            EmailLog[]
+
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+model EmailTemplate {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  subject     String
+  htmlContent String      // HTML email template
+  textContent String?     // Plain text fallback
+  variables   String      // JSON array of available variables like {{customerName}}, {{proposalLink}}
+  category    String      // proposal_send, follow_up, welcome, appointment_reminder, etc.
+  isActive    Boolean     @default(true)
+  
+  emailConfig EmailConfig @relation(fields: [emailConfigId], references: [id], onDelete: Cascade)
+  emailConfigId String
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  emailLogs   EmailLog[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([emailConfigId])
+}
+
+model EmailLog {
+  id            String      @id @default(uuid())
+  recipientEmail String
+  recipientName String?
+  subject       String
+  htmlContent   String
+  textContent   String?
+  status        EmailStatus @default(PENDING)
+  
+  // Tracking
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  bouncedAt     DateTime?
+  
+  // Error handling
+  errorMessage  String?
+  retryCount    Int         @default(0)
+  
+  // Relations
+  emailConfig   EmailConfig @relation(fields: [emailConfigId], references: [id], onDelete: Cascade)
+  emailConfigId String
+  emailTemplate EmailTemplate? @relation(fields: [emailTemplateId], references: [id], onDelete: SetNull)
+  emailTemplateId String?
+  
+  // Context
+  proposalId    String?     // If email relates to a proposal
+  customerId    String?     // If email relates to a customer
+  metadata      Json?       // Additional context data
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([recipientEmail])
+  @@index([status])
+  @@index([sentAt])
+  @@index([proposalId])
+  @@index([customerId])
+  @@index([emailConfigId])
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          String    // admin, technician, manager, sales
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  preferences   Json?     // User preferences as JSON
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([lastLogin])
+}
+
+// ========================================
+// VOICE-TO-PROPOSAL AI SYSTEM - NEW MODELS
+// ========================================
+
+model VoiceRecording {
+  id               String        @id @default(uuid())
+  filename         String        // Original filename
+  fileUrl          String        // Storage path/URL for audio file
+  fileSize         Int           // File size in bytes
+  duration         Float?        // Duration in seconds
+  mimeType         String        // audio/wav, audio/mp3, etc.
+  
+  // Audio processing status
+  transcriptionStatus String     @default("pending") // pending, processing, completed, failed
+  transcriptionText   String?    // Output from Whisper API
+  transcriptionError  String?    // Error message if transcription fails
+  
+  // AI proposal generation status
+  proposalStatus      String     @default("pending") // pending, processing, completed, failed
+  proposalError       String?    // Error message if proposal generation fails
+  
+  // Context for AI processing
+  customer            Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId          String?
+  property            Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyId          String?
+  
+  // Recording metadata
+  recordedBy          String     // User who made the recording
+  recordedAt          DateTime   @default(now())
+  processingStartedAt DateTime?
+  processingCompletedAt DateTime?
+  processingDurationMs Float?    // Processing time in milliseconds
+  
+  // Relations
+  aiProposals         AIProposal[]
+  
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([customerId])
+  @@index([propertyId])
+  @@index([transcriptionStatus])
+  @@index([proposalStatus])
+  @@index([recordedBy])
+  @@index([recordedAt])
+}
+
+model AIProposal {
+  id                  String         @id @default(uuid())
+  
+  // Source voice recording
+  voiceRecording      VoiceRecording @relation(fields: [voiceRecordingId], references: [id], onDelete: Cascade)
+  voiceRecordingId    String
+  
+  // AI processing details
+  promptUsed          String         // The prompt sent to GPT-4
+  modelVersion        String         // GPT model version used
+  processingTime      Float?         // Time taken to generate (seconds)
+  tokensUsed          Int?           // OpenAI tokens consumed
+  
+  // Generated proposal content
+  proposalName        String
+  description         String
+  customerPersona     String         // homeowner, architect, etc.
+  recommendedTier     String         // good, better, best
+  
+  // AI-detected customer info (if no customer linked)
+  detectedCustomerName String?
+  detectedCustomerType String?       // residential, commercial
+  detectedPropertyType String?       // single-family, office, etc.
+  
+  // AI-generated proposal items (JSON)
+  goodTierItems       String         // JSON array of items for Good tier
+  betterTierItems     String         // JSON array of items for Better tier  
+  bestTierItems       String         // JSON array of items for Best tier
+  
+  // Pricing estimates
+  goodTierTotal       Float?
+  betterTierTotal     Float?
+  bestTierTotal       Float?
+  
+  // User interaction
+  userApproved        Boolean?       // true/false/null (pending)
+  userNotes           String?        // User feedback/modifications
+  convertedToProposal Boolean        @default(false)
+  
+  // Link to converted proposal
+  finalProposal       Proposal?      @relation("FinalProposal", fields: [finalProposalId], references: [id], onDelete: SetNull)
+  finalProposalId     String?        @unique
+  
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([voiceRecordingId])
+  @@index([customerPersona])
+  @@index([recommendedTier])
+  @@index([userApproved])
+  @@index([convertedToProposal])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// ANALYTICS & KPI TRACKING MODELS - Added for Executive Dashboard
+// =============================================================================
+
+model AnalyticsEvent {
+  id            String    @id @default(uuid())
+  eventType     String    // persona_detection, product_recommendation, proposal_generated, customer_interaction, etc.
+  eventCategory String    // ai_performance, customer_experience, business_metrics, system_health
+  userId        String?   // Associated user/technician
+  customerId    String?   // Associated customer
+  proposalId    String?   // Associated proposal
+  
+  // Event Data
+  data          Json      // Flexible JSON for event-specific data
+  metadata      Json?     // Additional context/metadata
+  
+  // Performance Metrics
+  processingTime Float?   // Processing time in milliseconds
+  accuracy      Float?    // AI accuracy score (0-1)
+  confidence    Float?    // AI confidence score (0-1)
+  success       Boolean   @default(true)
+  errorMessage  String?
+  
+  // Business Impact
+  revenueImpact Float?    // Revenue attributed to this event
+  costSavings   Float?    // Cost savings from this event
+  
+  timestamp     DateTime  @default(now())
+  
+  // Relations
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  proposal      Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  kpiSnapshot   KPISnapshot? @relation(fields: [kpiSnapshotId], references: [id])
+  kpiSnapshotId String?
+
+  @@index([eventType])
+  @@index([eventCategory])
+  @@index([timestamp])
+  @@index([customerId])
+  @@index([proposalId])
+  @@index([success])
+  @@index([userId])
+}
+
+model KPISnapshot {
+  id          String    @id @default(uuid())
+  period      String    // hourly, daily, weekly, monthly
+  startTime   DateTime
+  endTime     DateTime
+  
+  // Revenue Impact KPIs
+  totalRevenue        Float   @default(0)
+  aiAttributedRevenue Float   @default(0)
+  conversionRate      Float   @default(0)
+  averageDealSize     Float   @default(0)
+  proposalToCloseRate Float   @default(0)
+  
+  // Efficiency Gains KPIs
+  proposalsGenerated    Int     @default(0)
+  avgProposalTime       Float   @default(0)
+  timeSavingsHours      Float   @default(0)
+  technicianProductivity Float  @default(0)
+  costSavings           Float   @default(0)
+  
+  // Customer Experience KPIs
+  customerSatisfaction  Float   @default(0)
+  responseRate          Float   @default(0)
+  engagementScore       Float   @default(0)
+  npsScore              Float?
+  
+  // AI Performance KPIs
+  personaAccuracy       Float   @default(0)
+  recommendationAccuracy Float  @default(0)
+  voiceProcessingSpeed   Float   @default(0)
+  systemUptime          Float   @default(0)
+  errorRate             Float   @default(0)
+  
+  // Competitive Advantage KPIs
+  timeToProposal        Float   @default(0)
+  proposalQualityScore  Float   @default(0)
+  marketAdvantageScore  Float   @default(0)
+  
+  // ROI Calculations
+  totalCosts            Float   @default(0)
+  netBenefit            Float   @default(0)
+  roiPercentage         Float   @default(0)
+  paybackPeriodDays     Float?
+  
+  // Sample Sizes
+  totalCustomers        Int     @default(0)
+  totalProposals        Int     @default(0)
+  totalInteractions     Int     @default(0)
+  
+  // Relations
+  analyticsEvents     AnalyticsEvent[]
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([period])
+  @@index([startTime])
+  @@index([endTime])
+}
+
+model CustomerInteractionTracking {
+  id              String    @id @default(uuid())
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId      String
+  
+  interactionType String    // proposal_view, email_open, voice_call, site_visit, follow_up
+  channel         String    // email, phone, in_person, web_portal, mobile_app
+  
+  // Engagement Metrics
+  duration        Float?    // Duration in seconds (for calls, meetings)
+  satisfaction    Float?    // Customer satisfaction score (1-10)
+  outcome         String?   // positive, neutral, negative, no_response
+  
+  // Context Data
+  proposalId      String?   // If interaction relates to specific proposal
+  notes           String?   // Additional context notes
+  followUpRequired Boolean  @default(false)
+  followUpDate    DateTime?
+  
+  // Metadata
+  timestamp       DateTime  @default(now())
+  recordedBy      String?   // User who recorded this interaction
+  metadata        Json?     // Additional context data
+
+  @@index([customerId])
+  @@index([interactionType])
+  @@index([timestamp])
+  @@index([proposalId])
+  @@index([satisfaction])
+}
+
+model ProposalMetrics {
+  id               String    @id @default(uuid())
+  proposal         Proposal  @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  proposalId       String
+  
+  // Generation Metrics
+  generationTime   Float?    // Time to generate proposal (seconds)
+  aiProcessingTime Float?    // AI processing time (seconds)
+  userEditTime     Float?    // Time user spent editing (seconds)
+  
+  // Engagement Metrics
+  viewCount        Int       @default(0)
+  viewDuration     Float?    // Total time spent viewing (seconds)
+  downloadCount    Int       @default(0)
+  shareCount       Int       @default(0)
+  
+  // Customer Response
+  status           String    @default("sent") // sent, viewed, responded, accepted, declined
+  responseTime     Float?    // Time to first response (hours)
+  
+  // Email Tracking (if sent via email)
+  sentAt           DateTime?
+  firstViewedAt    DateTime?
+  lastViewedAt     DateTime?
+  emailOpened      Boolean   @default(false)
+  emailClicked     Boolean   @default(false)
+  
+  // Conversion Tracking
+  convertedToSale  Boolean   @default(false)
+  conversionValue  Float?    // Final sale amount if converted
+  conversionDate   DateTime?
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([proposalId])
+  @@index([status])
+  @@index([sentAt])
+  @@index([convertedToSale])
+  @@index([responseTime])
+}
+
+model FinancialTracking {
+  id                String    @id @default(uuid())
+  
+  // Period tracking
+  periodType        String    // daily, weekly, monthly, quarterly, yearly
+  periodStart       DateTime
+  periodEnd         DateTime
+  
+  // Revenue Tracking
+  totalRevenue      Float     @default(0)
+  recurringRevenue  Float     @default(0)
+  newCustomerRevenue Float    @default(0)
+  upsellRevenue     Float     @default(0)
+  
+  // AI-Attributed Metrics
+  aiGeneratedRevenue     Float  @default(0)
+  aiProposalsCreated     Int    @default(0)
+  aiProposalsAccepted    Int    @default(0)
+  aiConversionRate       Float  @default(0)
+  
+  // Cost Tracking
+  operationalCosts  Float     @default(0)
+  aiServiceCosts    Float     @default(0)
+  laborCosts        Float     @default(0)
+  
+  // Efficiency Metrics
+  timeToProposal    Float     @default(0) // Average hours from inquiry to proposal
+  proposalAcceptanceRate Float @default(0)
+  customerAcquisitionCost Float @default(0)
+  customerLifetimeValue Float @default(0)
+  
+  // Market Position
+  marketShare       Float?    // If available
+  competitorAnalysis Json?    // Market intelligence data
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([periodType])
+  @@index([periodStart])
+  @@index([periodEnd])
 }
